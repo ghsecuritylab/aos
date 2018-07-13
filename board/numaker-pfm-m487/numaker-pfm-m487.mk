@@ -34,15 +34,6 @@ GLOBAL_DEFINES += CONFIG_AOS_CLI_BOARD
 #GLOBAL_DEFINES += AOS_SENSOR_ACC_SUPPORT_STEP
 #GLOBAL_DEFINES += IOTX_WITHOUT_TLS MQTT_DIRECT
 
-ifeq ($(COMPILER),armcc)
-GLOBAL_LDFLAGS += -L --scatter=board/$(NAME)/M487.sct
-else ifeq ($(COMPILER),iar)
-GLOBAL_LDFLAGS += --config M487.icf
-else
-GLOBAL_LDFLAGS += -T board/$(NAME)/M487.ld
-#GLOBAL_LDFLAGS += -T board/$(NAME)/gcc_arm.ld
-endif
-
 sal ?= 1
 no_tls ?= 1
 ifeq (1,$(sal))

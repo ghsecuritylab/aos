@@ -137,3 +137,11 @@ GLOBAL_LDFLAGS += -mcpu=cortex-m4  \
                   -mfpu=fpv4-sp-d16 \
                   $(CLIB_LDFLAGS_NANO_FLOAT)
 endif
+
+ifeq ($(COMPILER),armcc)
+GLOBAL_LDFLAGS += -L --scatter=platform/mcu/$(NAME)/M487.sct
+else ifeq ($(COMPILER),iar)
+GLOBAL_LDFLAGS += --config M487.icf
+else
+GLOBAL_LDFLAGS += -T platform/mcu/$(NAME)/M487.ld
+endif
