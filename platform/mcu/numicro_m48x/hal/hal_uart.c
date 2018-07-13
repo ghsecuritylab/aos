@@ -27,7 +27,7 @@ struct nu_uart_var {
     struct serial_s *  obj;
     uint32_t    fifo_size_tx;
     uint32_t    fifo_size_rx;
-	kmutex_t 	port_mutex;
+		kmutex_t 	port_mutex;
     ksem_t 		recv_sem;
 	ksem_t 		send_sem;
 };
@@ -258,16 +258,13 @@ exit_hal_get_serial_s:
  */
  int32_t hal_uart_init(uart_dev_t *uart)
 {
-	UARTName s_UartName;
+	struct nu_modinit_s *modinit;
 	struct serial_s* pserial_s;
-	const struct nu_modinit_s *modinit;
     struct nu_uart_var *var;
+	UARTName s_UartName;
 	UART_T* pUart;
 	uint32_t uart_tx, uart_rx;
-	
-    // NOTE: With armcc, init() gets called from _sys_open() timing of which is before main().
-	//soc_init();
-	
+
 	if ( !(pserial_s=hal_get_serial_s ( uart )) )
 		goto exit_hal_uart_init;
 
@@ -301,55 +298,59 @@ exit_hal_get_serial_s:
             pinmap_pinout(pserial_s->pin_rx, PinMap_UART_RX);
 
         } while (0);
+
+		if ( krhino_sem_create(&var->send_sem, "uartSend", 0) != RHINO_SUCCESS )
+			goto exit_hal_uart_init;
+
+		if ( krhino_sem_create(&var->recv_sem, "uartReceive", 0) != RHINO_SUCCESS )
+			goto exit_hal_uart_init;
+
+		if ( krhino_mutex_create(&var->port_mutex, "uartMutex") != RHINO_SUCCESS )
+			goto exit_hal_uart_init;
+
+		// Get Uart base address
+		pUart = (UART_T *) NU_MODBASE(s_UartName);
+		
+		/* Set UART Baudrate */
+		UART_Open(pUart, uart->config.baud_rate);
+		
+		// Set line configuration
+		if ( hal_uart_set_lineconf ( pUart, uart->config.data_width, uart->config.stop_bits, uart->config.parity) < 0 )
+			goto exit_hal_uart_init;
+
+		// Set flow-control parameters
+		if ( hal_uart_set_flowcontol ( pUart, uart->config.flow_control ) < 0 )
+			goto exit_hal_uart_init;
+
+		// Check mode parameters
+		switch (uart->config.mode)
+		{
+			case MODE_TX:
+			case MODE_RX:
+			case MODE_TX_RX:
+			break;
+			
+			default:
+				goto exit_hal_uart_init;
+			break;
+		}
+
+		/* Enable Interrupt */
+		UART_ENABLE_INT(pUart, UART_INTEN_RDAIEN_Msk);
+
+		/* Link parent and children. */
 		var->obj = pserial_s;
+		uart->priv = (void*)var ;
+
     }
    
     var->ref_cnt ++;
     
-    // Get Uart base address
-	pUart = (UART_T *) NU_MODBASE(s_UartName);
-	
-    /* Set UART Baudrate */
-	UART_Open(pUart, uart->config.baud_rate);
-	
-	// Set line configuration
-	if ( hal_uart_set_lineconf ( pUart, uart->config.data_width, uart->config.stop_bits, uart->config.parity) < 0 )
-		goto exit_hal_uart_init;
-
-	// Set flow-control parameters
-	if ( hal_uart_set_flowcontol ( pUart, uart->config.flow_control ) < 0 )
-		goto exit_hal_uart_init;
-
-	// Check mode parameters
-	switch (uart->config.mode)
-	{
-		case MODE_TX:
-		case MODE_RX:
-		case MODE_TX_RX:
-		break;
-		
-		default:
-			goto exit_hal_uart_init;
-		break;
-	}
-
-    /* Enable Interrupt */
-    UART_ENABLE_INT(pUart, UART_INTEN_RDAIEN_Msk);
-
     if (var->ref_cnt) {
         // Mark this module to be inited.
         int i = modinit - uart_modinit_tab;
         uart_modinit_mask |= 1 << i;
     }
-
-    if ( krhino_sem_create(&var->send_sem, "uartSend", 0) != RHINO_SUCCESS )
-        goto exit_hal_uart_init;
-
-    if ( krhino_sem_create(&var->recv_sem, "uartReceive", 0) != RHINO_SUCCESS )
-        goto exit_hal_uart_init;
-
-    if ( krhino_mutex_create(&var->port_mutex, "uartMutex") != RHINO_SUCCESS )
-        goto exit_hal_uart_init;
 
 	return HAL_OK;
 
@@ -375,27 +376,24 @@ exit_hal_uart_init:
 int32_t hal_uart_send(uart_dev_t *uart, const void *data, uint32_t size, uint32_t timeout)
 {
 	struct serial_s* pserial_s;
-    const struct nu_modinit_s *modinit;
     struct nu_uart_var *var;
+	UART_T* pUart;
     kstat_t stat = RHINO_SUCCESS;
 
-	UART_T* pUart;
-
-	if ( !(pserial_s=hal_get_serial_s ( uart )) )
+    if ( !uart || !uart->priv )
 		goto exit_hal_uart_send;
+
+	var = (struct nu_uart_var *)uart->priv;
+	/* Initialized? */
+	if ( !var->obj ) goto exit_hal_uart_send;
+
+	pserial_s = var->obj;
+	pUart = (UART_T *) NU_MODBASE(pserial_s->uart);
 
     if (timeout == 0)
         timeout = 0xffffffff;
 
-	// Find entry
-    if ( !(modinit = get_modinit(pserial_s->uart, uart_modinit_tab)) )
-   		goto exit_hal_uart_send;
-
-	/* Initialized? */
-	if ( !var->obj ) goto exit_hal_uart_send;
-
 	pUart = (UART_T *) NU_MODBASE(pserial_s->uart);
-    var = (struct nu_uart_var *) modinit->var;
 
     /* Wait for Lock */
     stat = krhino_mutex_lock(&var->port_mutex, timeout);
@@ -432,22 +430,19 @@ exit_hal_uart_send:
 int32_t hal_uart_recv(uart_dev_t *uart, void *data, uint32_t expect_size, uint32_t timeout)
 {
 	struct serial_s* pserial_s;
-    const struct nu_modinit_s *modinit;
     struct nu_uart_var *var;
 	UART_T* pUart;
 
-	if ( !(pserial_s=hal_get_serial_s ( uart )) )
+    if ( !uart || !uart->priv )
 		goto exit_hal_uart_recv;
 
-	// Find entry
-    if ( !(modinit = get_modinit(pserial_s->uart, uart_modinit_tab)) )
-   		goto exit_hal_uart_recv;
-
-	pUart = (UART_T *) NU_MODBASE(pserial_s->uart);
-    var = (struct nu_uart_var *) modinit->var;
+	var = (struct nu_uart_var *)uart->priv;
 
 	/* Initialized? */
 	if ( !var->obj ) goto exit_hal_uart_recv;
+
+	pserial_s = var->obj;
+	pUart = (UART_T *) NU_MODBASE(pserial_s->uart);
 
 	//uint32_t UART_Read(UART_T* uart, uint8_t pu8RxBuf[], uint32_t u32ReadBytes)
 	if ( UART_Read(pUart, (uint8_t*)data, expect_size) != expect_size )
@@ -506,53 +501,51 @@ exit_hal_uart_recv_II:
 int32_t hal_uart_finalize(uart_dev_t *uart)
 {
 	struct serial_s* pserial_s;
-    const struct nu_modinit_s *modinit;
-    struct nu_uart_var *var;
+	struct nu_modinit_s *modinit;
+	struct nu_uart_var *var;
 	UART_T* pUart;
 
-	if ( !(pserial_s=hal_get_serial_s ( uart )) )
+  if ( !uart || !uart->priv )
 		goto exit_hal_uart_finalize;
 
-	// Find entry
-    if ( !(modinit = get_modinit(pserial_s->uart, uart_modinit_tab)) )
-   		goto exit_hal_uart_finalize;
-
-	pUart = (UART_T *) NU_MODBASE(pserial_s->uart);
-    var = (struct nu_uart_var *) modinit->var;
-
+	var = (struct nu_uart_var *)uart->priv;
 	/* Initialized? */
 	if ( !var->obj ) goto exit_hal_uart_finalize;
 
-    var->ref_cnt --;
-    if (! var->ref_cnt) {
+	pserial_s = var->obj;
+	pUart = (UART_T *) NU_MODBASE(pserial_s->uart);
+
+	var->ref_cnt --;
+	if (! var->ref_cnt) {
 		
-        do {
-            UART_Close(pUart);
+		do {
+					UART_Close(pUart);
 
-            UART_DISABLE_INT(pUart, (UART_INTEN_RDAIEN_Msk | UART_INTEN_THREIEN_Msk | UART_INTEN_RXTOIEN_Msk));
-            NVIC_DisableIRQ(modinit->irq_n);
+					UART_DISABLE_INT(pUart, (UART_INTEN_RDAIEN_Msk | UART_INTEN_THREIEN_Msk | UART_INTEN_RXTOIEN_Msk));
+					NVIC_DisableIRQ(modinit->irq_n);
 
-            // Disable IP clock
-            CLK_DisableModuleClock(modinit->clkidx);
-        } while (0);
-    }
+					// Disable IP clock
+					CLK_DisableModuleClock(modinit->clkidx);
+		} while (0);
 
-    if (var->obj == pserial_s)
-        var->obj = NULL;
+		krhino_sem_del(&var->send_sem);
+		krhino_sem_del(&var->recv_sem);
+		krhino_mutex_del(&var->port_mutex);
 
-    if (! var->ref_cnt) {
-        // Mark this module to be deinited.
-        int i = modinit - uart_modinit_tab;
-        uart_modinit_mask &= ~(1 << i);
-    }
+		/* Unlink parent and children. */
+		var->obj = uart->priv = NULL ;
+	}
 
-    krhino_sem_del(&var->send_sem);
-    krhino_sem_del(&var->recv_sem);
-    krhino_mutex_del(&var->port_mutex);
+	if (! var->ref_cnt) {
+		// Mark this module to be deinited.
+		int i = modinit - uart_modinit_tab;
+		uart_modinit_mask &= ~(1 << i);
+	}
 
-    return HAL_OK;
+	return HAL_OK;
     
 exit_hal_uart_finalize:
 
 	return HAL_ERROR;
+
 }

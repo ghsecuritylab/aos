@@ -34,7 +34,7 @@ void pin_function(PinName pin, int data)
     uint32_t MFP_Msk;
 
     if ( pin == (PinName)NC )
-	halt_on_error_found(__func__, "pin is NC!!", 0);
+				halt_on_error_found(__func__, "pin is NC!!", 0);
 
     pin_index = NU_PINNAME_TO_PIN(pin);
     port_index = NU_PINNAME_TO_PORT(pin);
@@ -64,27 +64,58 @@ void pin_mode(PinName pin, PinMode mode)
     mode_intern = GPIO_MODE_INPUT;
 
     switch (mode) {
-    case PullUp:
-        mode_intern = GPIO_MODE_INPUT;
-        break;
 
-    case PullDown:
-    case PullNone:
-        // NOTE: Not support
-        return;
-
-    case PushPull:
+			case PushPull:
         mode_intern = GPIO_MODE_OUTPUT;
         break;
 
-    case OpenDrain:
+			case OpenDrain:
         mode_intern = GPIO_MODE_OPEN_DRAIN;
         break;
 
-    case Quasi:
+			case Quasi:
         mode_intern = GPIO_MODE_QUASI;
+        break;
+
+			default:
+				mode_intern = GPIO_MODE_INPUT;
         break;
     }
 
     GPIO_SetMode(gpio_base, 1 << pin_index, mode_intern);
+}
+
+void pin_pullctrl(PinName pin, PinPullCtrl pullctl)
+{
+    uint32_t pin_index;
+    uint32_t port_index;
+    GPIO_T *gpio_base;
+		uint32_t pullctl_intern;
+
+    if ( pin == (PinName)NC )
+        halt_on_error_found(__func__, "pin is NC!!", 0);
+
+    pin_index = NU_PINNAME_TO_PIN(pin);
+    port_index = NU_PINNAME_TO_PORT(pin);
+    gpio_base = NU_PORT_BASE(port_index);
+
+		pullctl_intern = GPIO_PUSEL_PULL_UP;
+		
+    switch (pullctl) {
+			case PullUp:
+					pullctl_intern = GPIO_PUSEL_PULL_UP;
+					break;
+
+			case PullDown:
+					pullctl_intern = GPIO_PUSEL_PULL_DOWN;
+					break;
+			
+			case PullNone:
+					pullctl_intern = GPIO_PUSEL_DISABLE;
+					break;
+			default:
+					return;
+    }
+
+    GPIO_SetPullCtl(gpio_base, 1 << pin_index, pullctl_intern);
 }

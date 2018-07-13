@@ -6,9 +6,6 @@
 #define HARDWARE_REVISION   "V3.0"
 #define MODEL               "NuMaker-PFM-M487"
 
-//#define STDIO_UART 0
-//#define STDIO_UART_BUADRATE 115200
-
 /* Platform HAL will refer these structures are defined by board-resource. */
 extern struct serial_s 	 board_uart [];
 extern struct i2c_s 	 board_i2c [];

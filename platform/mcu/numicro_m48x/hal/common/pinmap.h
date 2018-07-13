@@ -33,6 +33,7 @@ typedef struct {
 
 void pin_function(PinName pin, int function);
 void pin_mode    (PinName pin, PinMode mode);
+void pin_pullctrl(PinName pin, PinPullCtrl pullctl);
 
 uint32_t pinmap_peripheral(PinName pin, const PinMap* map);
 uint32_t pinmap_function(PinName pin, const PinMap* map);

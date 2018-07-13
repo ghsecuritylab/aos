@@ -27,6 +27,7 @@ size_t g_iram1_total_size = 0x00010000;
 uart_dev_t uart_0;
 static void stduart_init(void)
 {
+    memset((void*)&uart_0, 0, sizeof(uart_dev_t));
     uart_0.port                = STDIO_UART;
     uart_0.config.baud_rate    = STDIO_UART_BUADRATE;
     uart_0.config.data_width   = DATA_WIDTH_8BIT;
@@ -34,17 +35,16 @@ static void stduart_init(void)
     uart_0.config.mode         = MODE_TX_RX;
     uart_0.config.parity       = NO_PARITY;
     uart_0.config.stop_bits    = STOP_BITS_1;
-    uart_0.priv                = (void*)&board_uart[uart_0.port];
     hal_uart_init(&uart_0);
 }
 
 void numicro_soc_init(void)
 {
-	/* HAL Initialization */
+	  /* HAL Initialization */
     // HAL_Init();
 
     /* Configure the system clock */
-	soc_init();
+   	soc_init();
 
     /* Configure the Systick interrupt time */
     SysTick_Config ( SystemCoreClock / RHINO_CONFIG_TICKS_PER_SECOND);

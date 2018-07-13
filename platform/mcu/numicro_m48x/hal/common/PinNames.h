@@ -55,16 +55,18 @@ typedef enum {
 } PinDirection;
 
 typedef enum {
+		Input,
+    PushPull,
+    OpenDrain,
+    Quasi
+} PinMode;
+
+typedef enum {
     PullNone = 0,
     PullDown,
     PullUp,
-    
-    PushPull,
-    OpenDrain,
-    Quasi,
-    
-    PullDefault = PullUp,
-} PinMode;
+    PullDefault = PullUp
+} PinPullCtrl;
 
 typedef enum {
     // Not connected

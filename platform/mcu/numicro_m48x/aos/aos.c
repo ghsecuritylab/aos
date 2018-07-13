@@ -26,12 +26,6 @@ static void var_init()
     kinit.cli_enable = 1;
 }
 
-#if 0
-extern uint32_t __aos_heap_start;
-extern uint32_t __aos_heap_size_xd;
-extern uint32_t __aos_heap_size;
-#endif
-
 static void sys_init(void)
 {
     /* Call initialize functions in every board implementation. */
@@ -39,12 +33,6 @@ static void sys_init(void)
 
     /* Lock protected registers */
     //SYS_LockReg();
-    
-    #if 0
-    printf("__aos_heap_size_xd=%d, %x\r\n", (uint32_t)&__aos_heap_size_xd, (uint32_t)&__aos_heap_size_xd );
-    printf("__aos_heap_size=%d\r\n", 	(uint32_t)&__aos_heap_size);
-    printf("__aos_heap_start=%x\r\n", (uint32_t)&__aos_heap_start);
-    #endif
 
     board_init();
 
@@ -66,7 +54,7 @@ int main(void)
     /* Create Task for system initialization and demo. */
     krhino_task_dyn_create ( &g_aos_init, "aos-init", 0, AOS_DEFAULT_APP_PRI, 0, AOS_START_STACK, (task_entry_t)sys_init, 1 );
 
-    /* Start scheduling from first task. */
+    /* Start scheduling & execute first task. */
     aos_start();
 
     return 0;
