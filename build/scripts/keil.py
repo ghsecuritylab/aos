@@ -52,7 +52,7 @@ def changeItemForMcu( tree ):
     if 'stm32l432' in buildstring:
         ScatterFile.text = '..\..\..\..\platform\mcu\stm32l4xx\src\STM32L432KC-Nucleo\STM32L432.sct'
     if 'm487' in buildstring:
-        ScatterFile.text = '..\..\..\..\platform\mcu\numicro_m48x\M487.sct'
+        ScatterFile.text = '../../../../platform/mcu/numicro_m48x/M487.sct'
     
 # change key word in project file. automation to do
 def ModifyProjString( projString ):
@@ -116,7 +116,7 @@ def gen_main(target, script):
         template_tree = etree.parse('build/scripts/template.uvprojx')
     if 'm487' in buildstring:
         template_tree = etree.parse('build/scripts/template_numicro.uvprojx')
-	    
+    
     # create uvprojx file
     gen_project(template_tree, target, script)
     
