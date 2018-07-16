@@ -403,8 +403,9 @@ void Reset_Handler_1(void)
      */
     SystemInit();
     
+		/* We need enable SRAM2 clock in SPIM for accessing the lastest 32KB area. */
 		#define ENABLE_SPIM_CACHE
-        #ifdef ENABLE_SPIM_CACHE
+    #ifdef ENABLE_SPIM_CACHE
     CLK->AHBCLK |= CLK_AHBCLK_SPIMCKEN_Msk;
     SPIM_DISABLE_CACHE();
     SPIM_ENABLE_CCM();
