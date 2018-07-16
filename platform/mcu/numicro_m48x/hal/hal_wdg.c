@@ -22,6 +22,39 @@
 #include <hal/hal.h>
 #include "board.h"
 
+static uint32_t g_bWdtInited=0;
+static uint32_t g_u32WDTINTCounts=0;
+static uint32_t g_u32TimeCnt=0;
+
+/**
+ * @brief       IRQ Handler for WDT Interrupt
+ *
+ * @param       None
+ *
+ * @return      None
+ *
+ * @details     The WDT_IRQHandler is default IRQ of WDT, declared in startup_M480.s.
+ */
+void WDT_IRQHandler(void)
+{
+    if ( g_u32WDTINTCounts < g_u32TimeCnt )
+        WDT_RESET_COUNTER();
+
+    if(WDT_GET_TIMEOUT_INT_FLAG() == 1)
+    {
+        /* Clear WDT time-out interrupt flag */
+        WDT_CLEAR_TIMEOUT_INT_FLAG();
+				g_u32WDTINTCounts++;
+    }
+
+    if(WDT_GET_TIMEOUT_WAKEUP_FLAG() == 1)
+    {
+        /* Clear WDT time-out wake-up flag */
+        WDT_CLEAR_TIMEOUT_WAKEUP_FLAG();
+    }
+}
+
+
 /**
  * This function will initialize the on board CPU hardware watch dog
  *
@@ -31,7 +64,50 @@
  */
 int32_t hal_wdg_init(wdg_dev_t *wdg)
 {
+	if ( !wdg )
+		goto exit_hal_wdg_init;
+	
+	if ( !g_bWdtInited )
+	{
+		/* Enable IP module clock */
+		CLK_EnableModuleClock(WDT_MODULE);
+
+		/* Peripheral clock source */
+		CLK_SetModuleClock(WDT_MODULE, CLK_CLKSEL1_WDTSEL_LIRC, 0);
+		
+		/* To check if system has been reset by WDT time-out reset or not */
+		if ( WDT_GET_RESET_FLAG() == 1 )
+		{
+				WDT_CLEAR_RESET_FLAG();
+				printf("*** System has been reset by WDT time-out event ***\n\n");
+				//while(1);
+		}
+		/* Enable WDT NVIC */
+		NVIC_EnableIRQ(WDT_IRQn);
+
+		/* Because of all bits can be written in WDT Control Register are write-protected;
+			 To program it needs to disable register protection first. */
+		SYS_UnlockReg();
+
+
+    /* Time-out interval is 2^14 * WDT clock */
+    /* around 1.6384 ~ 1.7408 s              */
+    WDT_Open ( WDT_TIMEOUT_2POW14, WDT_RESET_DELAY_18CLK, TRUE, TRUE );
+	 
+		/* Configure WDT settings and start WDT counting */
+		g_u32TimeCnt = (wdg->config.timeout / 1.638);		/* Assume the timeout definition is in mili-second. */
+
+		/* Enable WDT interrupt function */
+		WDT_EnableInt();
+	}
+	
+	g_bWdtInited = 1;
+
 	return HAL_OK;
+
+exit_hal_wdg_init:
+	
+	return HAL_ERROR;
 }
 
 /**
@@ -41,7 +117,11 @@ int32_t hal_wdg_init(wdg_dev_t *wdg)
  */
 void hal_wdg_reload(wdg_dev_t *wdg)
 {
-	return HAL_OK;
+		if ( g_bWdtInited ) 
+		{
+			g_u32WDTINTCounts = 0;
+			WDT_RESET_COUNTER(); /* Do WDT reload */
+		}
 }
 
 /**
@@ -53,5 +133,21 @@ void hal_wdg_reload(wdg_dev_t *wdg)
  */
 int32_t hal_wdg_finalize(wdg_dev_t *wdg)
 {
+	if ( g_bWdtInited ) 
+	{
+		WDT_DisableInt();
+
+		/* Enable WDT NVIC */
+		NVIC_DisableIRQ(WDT_IRQn);
+
+		/* Clear WDT time-out flag */
+		WDT_CLEAR_RESET_FLAG();	
+
+		/* Disable IP module clock */
+		CLK_DisableModuleClock(WDT_MODULE);
+	}
+	
+	g_bWdtInited = 0;
+
 	return HAL_OK;
 }
