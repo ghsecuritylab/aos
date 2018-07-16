@@ -153,6 +153,61 @@ void soc_err_proc(kstat_t err)
 
 krhino_err_proc_t g_err_proc = soc_err_proc;
 
+void soc_init(void)
+{
+    // NOTE: Support singleton semantics to be called from other init functions
+    static int inited = 0;
+    if (inited) {
+        return;
+    }
+    inited = 1;
+    
+    /*---------------------------------------------------------------------------------------------------------*/
+    /* Init System Clock                                                                                       */
+    /*---------------------------------------------------------------------------------------------------------*/
+    /* Unlock protected registers */
+    SYS_UnlockReg();
+
+    /* Enable HIRC clock (Internal RC 22.1184MHz) */
+    CLK_EnableXtalRC(CLK_PWRCTL_HIRCEN_Msk);
+    /* Enable HXT clock (external XTAL 12MHz) */
+    CLK_EnableXtalRC(CLK_PWRCTL_HXTEN_Msk);
+    /* Enable LIRC for lp_ticker */
+    CLK_EnableXtalRC(CLK_PWRCTL_LIRCEN_Msk);
+    /* Enable LXT for RTC */
+    CLK_EnableXtalRC(CLK_PWRCTL_LXTEN_Msk);
+
+    /* Wait for HIRC clock ready */
+    CLK_WaitClockReady(CLK_STATUS_HIRCSTB_Msk);
+    /* Wait for HXT clock ready */
+    CLK_WaitClockReady(CLK_STATUS_HXTSTB_Msk);
+    /* Wait for LIRC clock ready */
+    CLK_WaitClockReady(CLK_STATUS_LIRCSTB_Msk);
+    /* Wait for LXT clock ready */
+    CLK_WaitClockReady(CLK_STATUS_LXTSTB_Msk);
+
+    /* Select HCLK clock source as HIRC and HCLK clock divider as 1 */
+    CLK_SetHCLK(CLK_CLKSEL0_HCLKSEL_HIRC, CLK_CLKDIV0_HCLK(1));
+    
+    /* Set core clock as 192000000 from PLL */
+    CLK_SetCoreClock(192000000);
+    
+    /* Set PCLK0/PCLK1 to HCLK/2 */
+    CLK->PCLKDIV = (CLK_PCLKDIV_PCLK0DIV2 | CLK_PCLKDIV_PCLK1DIV2); // PCLK divider set 2
+    
+//#if DEVICE_ANALOGIN
+//    /* Vref connect to internal */
+    SYS->VREFCTL = (SYS->VREFCTL & ~SYS_VREFCTL_VREFCTL_Msk) | SYS_VREFCTL_VREF_3_0V;
+//#endif
+    
+    /* Update System Core Clock */
+    /* User can use SystemCoreClockUpdate() to calculate SystemCoreClock. */
+    SystemCoreClockUpdate();
+
+    /* Lock protected registers */
+    SYS_LockReg();
+}
+
 void SysTick_Handler(void)
 {
     krhino_intrpt_enter();

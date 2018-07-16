@@ -64,7 +64,6 @@ $(NAME)_SOURCES += \
 $(NAME)_SOURCES += aos/soc_impl.c \
                    aos/trace_impl.c \
                    aos/aos.c \
-                   hal/common/os_overrides.c \
                    hal/common/pinmap_common.c \
                    hal/common/PeripheralPins.c \
                    hal/common/pinmap.c \
