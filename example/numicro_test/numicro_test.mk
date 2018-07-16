@@ -1,6 +1,6 @@
-NAME := numirco_test
+NAME := numicro_test
 
-$(NAME)_SOURCES := numirco_test.c
+$(NAME)_SOURCES := numicro_test.c
 
 GLOBAL_DEFINES += AOS_NO_WIFI
 
