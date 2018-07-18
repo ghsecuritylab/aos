@@ -22,6 +22,229 @@
 #include <hal/hal.h>
 #include "board.h"
 
+#define ROUND_DOWN(a,b) 	(((a) / (b)) * (b))
+#define MIN(a,b)        	(((a) < (b)) ? (a) : (b))
+#define FLASH_PAGE_SIZE		FMC_FLASH_PAGE_SIZE
+
+static void platform_flash_lock(void)
+{
+  SYS_UnlockReg();                   /* Unlock register lock protect */
+	FMC_DISABLE_AP_UPDATE();			/* Disable FMC ISP function */
+	FMC_Close();									/* Disable APROM erase/program */
+  SYS_LockReg();                   /* Unlock register lock protect */
+}
+
+static void platform_flash_unlock(void)
+{
+  SYS_UnlockReg();                   /* Unlock register lock protect */	
+	FMC_Open();										/* Enable FMC ISP function */
+  FMC_ENABLE_AP_UPDATE();				/* Enable APROM erase/program */
+}
+
+static int32_t platform_flash_erase(uint32_t addr_start, uint32_t lengthInBytes)
+{
+	int ret = -1;
+	int i=0;
+	int page_num;
+	
+	//printf ("[%s]addr_start=%08x, size=%d\r\n", __func__, addr_start, lengthInBytes );
+	
+	if ( (addr_start%FMC_FLASH_PAGE_SIZE) != 0 ) //must be a 4k-aligned address
+		goto exit_platform_flash_erase;
+	
+	page_num = ( (lengthInBytes-1)/FMC_FLASH_PAGE_SIZE ) +1;
+	
+	if ( (lengthInBytes%FMC_FLASH_PAGE_SIZE) != 0 ) //must be a 4k-aligned size
+		printf ("[%s]lengthInBytes is not multiple of 8. will erase-%d pages\r\n", __func__, page_num );
+
+
+	for ( i=0; i<page_num; i++ )
+	 if (	FMC_Erase ( addr_start+i*FMC_FLASH_PAGE_SIZE ) < 0 )
+		 break;
+	 
+	if ( i != page_num )
+		goto exit_platform_flash_erase;		
+	
+	return 0;
+
+exit_platform_flash_erase:
+	
+	return ret;	
+}
+
+/**
+  * @brief   Program Multi-Word data into specified address of flash.
+  * @param[in]  u32Addr    Start flash address in APROM where the data chunk to be programmed into.
+  *                        This address must be 8-bytes aligned to flash address.
+  * @param[in]  pu32Buf    Buffer that carry the data chunk.
+  * @param[in]  u32Len     Length of the data chunk in bytes.
+  * @retval   >=0  Number of data bytes were programmed.
+  * @return   -1   Invalid address.
+  */
+static int32_t platform_flash_write_8bytes(uint32_t addr_start, uint32_t u32data0, uint32_t u32data1)
+{
+	//if ( (u32data0!=0xffffffff) || (u32data1!=0xffffffff) )
+		//	printf ( "@@@@ [%s] %08x%08x@%08x  ##### %08x\r\n", __func__, u32data1, u32data0, addr_start, FMC_ReadDataFlashBaseAddr() );
+	
+	return FMC_Write8Bytes((uint32_t)addr_start, u32data0, u32data1);
+}
+
+static int32_t platform_flash_read(uint32_t* addr_start, const void *in_buf, uint32_t in_buf_len)
+{
+	
+	//printf ("[%s]addr_start=%08x, pbuf=%08x size=%d\r\n", __func__, addr_start, in_buf, in_buf_len );
+	
+	if ( !addr_start  || !in_buf || !in_buf_len )
+		goto exit_platform_flash_read;
+
+	memcpy(in_buf, addr_start, in_buf_len);
+
+	return in_buf_len;
+
+exit_platform_flash_read:
+	return -1;
+}
+
+/**
+  * @brief  Erase FLASH memory page(s) at address.
+  * @note   The range to erase shall not cross the bank boundary.
+  * @param  In: address     Start address to erase from.
+  * @param  In: len_bytes   Length to be erased.
+  * @retval  0:  Success.
+            -1:  Failure.
+  */
+int FLASH_erase_at(uint32_t address, uint32_t len_bytes)
+{
+    return platform_flash_erase(address, len_bytes);
+}
+
+/**
+  * @brief  Write to FLASH memory.
+  * @param  In: address     Destination address.
+  * @param  In: pData       Data to be programmed: Must be 8 byte aligned.
+  * @param  In: len_bytes   Number of bytes to be programmed.
+  * @retval  0: Success.
+            -1: Failure.
+  */
+int FLASH_write_at(uint32_t address, uint64_t *pData, uint32_t len_bytes)
+{
+    int i;
+    int ret = -1;
+		uint32_t * psU32Data;
+	
+#ifndef CODE_UNDER_FIREWALL
+    /* irq already mask under firewall */
+    __disable_irq();
+#endif
+
+    for (i = 0; i < len_bytes; i += 8) {
+				psU32Data = (uint32_t*)(pData + (i / 8));
+        if ( platform_flash_write_8bytes ( address + i, psU32Data[0], psU32Data[1] ) != HAL_OK) {
+            break;
+        }
+    }
+    /* Memory check */
+    for (i = 0; i < len_bytes; i += 4) {
+        uint32_t *dst = (uint32_t *)(address + i);
+        uint32_t *src = ((uint32_t *) pData) + (i / 4);
+
+        if ( *dst != *src ) {
+#ifndef CODE_UNDER_FIREWALL
+            printf("Write failed @0x%08lx, read value=0x%08lx, expected=0x%08lx\n", (uint32_t) dst, *dst, *src);
+#endif
+            //break;
+        }
+        ret = 0;
+    }
+#ifndef CODE_UNDER_FIREWALL
+    /* irq should never be enable under firewall */
+    __enable_irq();
+#endif
+    return ret;
+}
+
+/*****************************************************************/
+/**
+  * @brief  Read from FLASH memory.
+  * @param  In: address     Destination address.
+  * @param  In: pData       Data to be programmed: Must be 8 byte aligned.
+  * @param  In: len_bytes   Number of bytes to be programmed.
+  * @retval  0: Success.
+            -1: Failure.
+  */
+int FLASH_read_at(uint32_t address, uint64_t *pData, uint32_t len_bytes)
+{
+    int i;
+    int ret = -1;
+    uint32_t *src = (uint32_t *)(address);
+    uint32_t *dst = ((uint32_t *) pData);
+
+
+    for (i = 0; i < len_bytes; i += 4) {
+        *(dst + i / 4) = *(src++);
+    }
+
+    ret = 0;
+    return ret;
+}
+
+int FLASH_update(uint32_t dst_addr, const void *data, uint32_t size)
+{
+    int ret = 0;
+    int remaining = size;
+    uint8_t *src_addr = (uint8_t *) data;
+    uint32_t fl_addr = 0;
+    int fl_offset = 0;
+    int len = 0;
+    uint64_t *page_cache = NULL;
+
+    page_cache = (uint64_t *)krhino_mm_alloc(FLASH_PAGE_SIZE);
+    if (page_cache == NULL) {
+        return -1;
+    }
+    memset(page_cache, 0, FLASH_PAGE_SIZE);
+
+    do {
+        fl_addr = ROUND_DOWN(dst_addr, FLASH_PAGE_SIZE);
+        fl_offset = dst_addr - fl_addr;
+        len = MIN(FLASH_PAGE_SIZE - fl_offset, remaining);
+
+        /* Load from the flash into the cache */
+        memcpy(page_cache, (void *) fl_addr, FLASH_PAGE_SIZE);
+        /* Update the cache from the source */
+        memcpy((uint8_t *)page_cache + fl_offset, src_addr, len);
+        /* Erase the page, and write the cache */
+        ret = FLASH_erase_at(fl_addr, FLASH_PAGE_SIZE);
+        if (ret != 0) {
+            printf("Error erasing at 0x%08lx\n", fl_addr);
+        } else {
+            ret = FLASH_write_at(fl_addr, page_cache, FLASH_PAGE_SIZE);
+            if (ret != 0) {
+                printf("Error writing %lu bytes at 0x%08lx\n", FLASH_PAGE_SIZE, fl_addr);
+            } else {
+                dst_addr += len;
+                src_addr += len;
+                remaining -= len;
+            }
+        }
+    } while ((ret == 0) && (remaining > 0));
+
+    krhino_mm_free(page_cache);
+    return ret;
+}
+
+extern const hal_logic_partition_t hal_partitions[HAL_PARTITION_MAX];
+
+static void hal_flash_print_info(hal_partition_t in_partition)
+{
+	printf ("**** [%s]owner=%d (%s) @%08x, %d - %x\r\n", __func__, \
+													hal_partitions[ in_partition ].partition_owner,
+												  hal_partitions[ in_partition ].partition_description,
+													hal_partitions[ in_partition ].partition_start_addr,
+													hal_partitions[ in_partition ].partition_length,
+													hal_partitions[ in_partition ].partition_options );
+}
+
 /**
  * Get the infomation of the specified flash area
  *
@@ -31,7 +254,8 @@
  */
 hal_logic_partition_t *hal_flash_get_info(hal_partition_t in_partition)
 {
-	return HAL_OK;
+	//hal_flash_print_info(in_partition);
+	return (hal_logic_partition_t *)&hal_partitions[ in_partition ];
 }
 
 /**
@@ -50,7 +274,31 @@ hal_logic_partition_t *hal_flash_get_info(hal_partition_t in_partition)
  */
 int32_t hal_flash_erase(hal_partition_t in_partition, uint32_t off_set, uint32_t size)
 {
-	return HAL_OK;
+    int ret = 0;
+    uint32_t start_addr;
+    uint32_t erase_size;
+    hal_logic_partition_t *partition_info;
+    hal_partition_t real_pno;
+
+    platform_flash_unlock();
+
+    real_pno = in_partition;
+    partition_info = hal_flash_get_info( real_pno );
+    if (size + off_set > partition_info->partition_length) {
+        return -1;
+    }
+
+    start_addr = ROUND_DOWN((partition_info->partition_start_addr + off_set), FLASH_PAGE_SIZE);
+    erase_size = partition_info->partition_start_addr + off_set - start_addr + size;
+
+    ret = FLASH_erase_at(start_addr, erase_size);
+    if (ret != 0) {
+        printf("FLASH_erase_at return failed\n");
+    }
+
+    platform_flash_lock();
+
+    return 0;
 }
 
 
@@ -70,7 +318,24 @@ int32_t hal_flash_erase(hal_partition_t in_partition, uint32_t off_set, uint32_t
 int32_t hal_flash_write(hal_partition_t in_partition, uint32_t *off_set,
                         const void *in_buf, uint32_t in_buf_len)
 {
-	return HAL_OK;
+    int ret = 0;
+    uint32_t start_addr;
+    hal_logic_partition_t *partition_info;
+    hal_partition_t real_pno;
+
+    platform_flash_unlock();
+
+    real_pno = in_partition;
+    partition_info = hal_flash_get_info( real_pno );
+    start_addr = partition_info->partition_start_addr + *off_set;
+    if (0 != FLASH_update(start_addr, in_buf, in_buf_len)) {
+        printf("FLASH_update failed!\n");
+    }
+    *off_set += in_buf_len;
+
+    platform_flash_lock();
+
+    return 0;
 }
 
 /**
@@ -89,6 +354,13 @@ int32_t hal_flash_write(hal_partition_t in_partition, uint32_t *off_set,
 int32_t hal_flash_erase_write(hal_partition_t in_partition, uint32_t *off_set,
                               const void *in_buf, uint32_t in_buf_len)
 {
+//  printf ("[%s]off=%d, pbuf=%08x size=%d\r\n", __func__, *off_set ,in_buf, in_buf_len );
+
+	if ( hal_flash_erase(in_partition, *off_set, in_buf_len) < 0 )
+		return HAL_ERROR;
+	else if ( hal_flash_write(in_partition, off_set, in_buf, in_buf_len) < 0 )
+		return HAL_ERROR;
+	
 	return HAL_OK;
 }
 
@@ -108,7 +380,24 @@ int32_t hal_flash_erase_write(hal_partition_t in_partition, uint32_t *off_set,
 int32_t hal_flash_read(hal_partition_t in_partition, uint32_t *off_set,
                        void *out_buf, uint32_t in_buf_len)
 {
-	return HAL_OK;
+    uint32_t start_addr;
+    hal_logic_partition_t *partition_info;
+    hal_partition_t real_pno;
+ 
+    real_pno = in_partition;
+
+    partition_info = hal_flash_get_info( real_pno );
+	//	printf ("[%s] off_set=%x, out_buf=%x %d>%d\r\n", __func__, off_set, out_buf, (*off_set + in_buf_len), partition_info->partition_length );
+
+    if (off_set == NULL || out_buf == NULL || *off_set + in_buf_len > partition_info->partition_length) {
+        return -1;
+    }
+
+    start_addr = partition_info->partition_start_addr + *off_set;
+    FLASH_read_at(start_addr, out_buf, in_buf_len);
+    *off_set += in_buf_len;
+
+    return 0;
 }
 
 /**
