@@ -3,10 +3,17 @@
  */
 
 #include <aos/aos.h>
-
 #include <hal/hal.h>
-uint8_t pngbuf [ 32 ];
 
+#include "board.h"
+
+#define DEF_TEST_RNG 	0
+#define DEF_TEST_WDT 	0
+#define DEF_TEST_RTC 	0 
+#define DEF_TEST_BTN 	0
+#define DEF_TEST_DO		1
+
+uint8_t pngbuf [ 32 ];
 random_dev_t 	g_sRngDev;
 wdg_dev_t 		g_sWdtDev;
 rtc_dev_t 		g_sRtcDev;
@@ -54,41 +61,107 @@ static rtc_test ()
 	
 }
 
+//D0~D14
+extern gpio_dev_t board_gpio_table[];
+static digitalout_test()
+{
+	int i;
+	static int toggle=0;
+	
+	for (i = 0; i < i32BoardMaxGPIONum; ++i)
+		hal_gpio_output_toggle(&board_gpio_table[i]);
+
+	#if 0
+	for (i = 0; i < i32BoardMaxGPIONum; ++i)
+	{
+		if(toggle)
+			hal_gpio_output_high(&board_gpio_table[i]);
+		else
+			hal_gpio_output_low(&board_gpio_table[i]);
+	}
+	toggle = ~toggle;
+	#endif
+}	
+
+
 static void testcase_run(){
+
+	if (DEF_TEST_RNG)
 		rng_test();
+	
+	if (DEF_TEST_WDT)
 		wdt_test();
+
+	if (DEF_TEST_RTC)
 		rtc_test();
+
+	if (DEF_TEST_DO)
+		digitalout_test();
+}
+
+void key_process(input_event_t *eventinfo, void *priv_data)
+{
+    if (eventinfo->type != EV_KEY) {
+        return;
+    }
+
+    LOG("[%d %d %d %d]\n" , eventinfo->time, eventinfo->type, eventinfo->code, eventinfo->value);
+    if (eventinfo->code == 16) {
+        if (eventinfo->value == VALUE_KEY_CLICK) {
+            LOG("SW2 press do_active\n");
+        } else if (eventinfo->value == VALUE_KEY_LTCLICK) {
+            LOG("SW2 press do_reset\n");
+        }
+    } else if (eventinfo->code == 17) {
+        if (eventinfo->value == VALUE_KEY_CLICK) {
+            LOG("SW3 press do_active\n");
+        } else if (eventinfo->value == VALUE_KEY_LTCLICK) {
+            LOG("SW3 press do_reset\n");
+        }		
+		}
+		
 }
 
 static void testcase_init() {
 
 	//RNG
-	memset((void*)&g_sRngDev, 0, sizeof(g_sRngDev));
+	if (DEF_TEST_RNG)
+		memset((void*)&g_sRngDev, 0, sizeof(g_sRngDev));
 	
 	//WDT
-	memset((void*)&g_sWdtDev, 0, sizeof(g_sWdtDev));
-	g_sWdtDev.config.timeout=3;
-	hal_wdg_init(&g_sWdtDev);
+	if (DEF_TEST_WDT)
+	{
+		memset((void*)&g_sWdtDev, 0, sizeof(g_sWdtDev));
+		g_sWdtDev.config.timeout=3;
+		hal_wdg_init(&g_sWdtDev);
+	}
 	
 	//RTC
-	memset((void*)&g_sRtcDev, 0, sizeof(g_sRtcDev));
-	hal_rtc_init(&g_sRtcDev);
-	memset ( &g_sRtcTimeData, 0, sizeof(g_sRtcTimeData) );
-	//2018-07-16 16:25:00
-	g_sRtcTimeData.year 		= 18;
-	g_sRtcTimeData.month 		=	7;
-	g_sRtcTimeData.date			= 16;
-	g_sRtcTimeData.weekday	= 1;
-	g_sRtcTimeData.hr				= 16;
-	g_sRtcTimeData.min			= 25;
-	g_sRtcTimeData.sec			= 0;	
-	g_sRtcDev.config.format = HAL_RTC_FORMAT_DEC;
-  hal_rtc_set_time(&g_sRtcDev, &g_sRtcTimeData);
+	if (DEF_TEST_RTC)
+	{
+		memset((void*)&g_sRtcDev, 0, sizeof(g_sRtcDev));
+		hal_rtc_init(&g_sRtcDev);
+		memset ( &g_sRtcTimeData, 0, sizeof(g_sRtcTimeData) );
+		//2018-07-16 16:25:00
+		g_sRtcTimeData.year 		= 18;
+		g_sRtcTimeData.month 		=	7;
+		g_sRtcTimeData.date			= 16;
+		g_sRtcTimeData.weekday	= 1;
+		g_sRtcTimeData.hr				= 16;
+		g_sRtcTimeData.min			= 25;
+		g_sRtcTimeData.sec			= 0;	
+		g_sRtcDev.config.format = HAL_RTC_FORMAT_DEC;
+		hal_rtc_set_time(&g_sRtcDev, &g_sRtcTimeData);
+	}
+	
+	// SW2/SW3
+	if (DEF_TEST_DO)
+			aos_register_event_filter(EV_KEY, key_process, NULL);
 }
 
 static void app_delayed_action(void *arg)
 {
-	LOG("helloworld %s:%d %s\r\n", __func__, __LINE__, aos_task_name());
+	//LOG("helloworld %s:%d %s\r\n", __func__, __LINE__, aos_task_name());
 		
 	testcase_run();
 

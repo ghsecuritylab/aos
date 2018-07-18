@@ -30,18 +30,12 @@ extern "C" {
 #endif
 
 struct gpio_s {
-    PinName  pin;
-    uint32_t mask;
-};
+    PinName		pin;
+    uint32_t	mask;
 
-struct gpio_irq_s {
-    //IRQn_Type irq_n;
-    //uint32_t irq_index;
-    //uint32_t event;
-    
-    PinName     pin;
-    uint32_t    irq_handler;
-    uint32_t    irq_id;
+		/* For GPIO IRQ */
+    uint32_t	irq_handler;
+		void*			arg;
 };
 
 struct port_s {

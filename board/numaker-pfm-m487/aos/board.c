@@ -1,4 +1,6 @@
 #include <aos/kernel.h>
+#include <aos/aos.h>
+
 #include "hal/soc/soc.h"
 #include "board.h"
 
@@ -73,6 +75,8 @@ struct gpio_s board_gpio [] =
 	{ .pin = D13 },
 	{ .pin = D14 },
 	{ .pin = D15 },	
+	{ .pin = SW2 },	
+	{ .pin = SW3 },	
 };
 const int i32BoardMaxGPIONum  = sizeof( board_gpio ) / sizeof( board_gpio[0] );
 
@@ -132,8 +136,29 @@ struct qspi_s board_qspi [] =
 };
 const int i32BoardMaxQSPINum  = sizeof( board_qspi ) / sizeof( board_qspi[0] );
 
-
 // FIXME
+gpio_dev_t board_gpio_table[] = 
+{
+    {0,  OUTPUT_PUSH_PULL, NULL},//0
+    {1,  OUTPUT_PUSH_PULL, NULL},      
+    {2,  OUTPUT_PUSH_PULL, NULL},     
+    {3,  OUTPUT_PUSH_PULL, NULL},     
+    {4,  OUTPUT_PUSH_PULL, NULL},       
+    {5,  OUTPUT_PUSH_PULL, NULL},       
+    {6,  OUTPUT_PUSH_PULL, NULL},        
+    {7,  OUTPUT_PUSH_PULL, NULL},       
+    {8,  OUTPUT_PUSH_PULL, NULL},        
+    {9,  OUTPUT_PUSH_PULL, NULL},//9          
+    {10, OUTPUT_PUSH_PULL, NULL},          
+    {11, OUTPUT_PUSH_PULL, NULL},            
+    {12, OUTPUT_PUSH_PULL, NULL},      
+    {13, OUTPUT_PUSH_PULL, NULL},
+    {14, OUTPUT_PUSH_PULL, NULL},
+    {15, OUTPUT_PUSH_PULL, NULL},
+    {16, IRQ_MODE, 				NULL},//16
+    {17, IRQ_MODE, 				NULL},
+};
+
 /* Board partition */
 static void board_partition_init()
 {
@@ -168,8 +193,73 @@ static void board_partition_init()
     hal_partitions[HAL_PARTITION_CUSTOM_1].partition_options             = PAR_OPT_READ_EN | PAR_OPT_WRITE_EN;
 }
 
+static uint64_t   awss_time = 0;
+
+static void key_poll_func(void *arg)
+{
+    uint32_t level;
+    uint64_t diff;
+		gpio_dev_t* psgpio;
+	
+    hal_gpio_input_get((gpio_dev_t*)arg, &level);
+		psgpio = (gpio_dev_t*)arg;
+	
+    if (level == 0) { // still pressed
+        aos_post_delayed_action(10, key_poll_func, arg);
+    } else {		// released
+        diff = aos_now_ms() - awss_time;
+        if (diff > 5000) { 				/*long long press, 5 seconds */
+            awss_time = 0;
+            aos_post_event(EV_KEY, psgpio->port, VALUE_KEY_LLTCLICK);
+        } else if (diff > 2000) { /* long press, 2 seconds */
+            awss_time = 0;
+            aos_post_event(EV_KEY, psgpio->port, VALUE_KEY_LTCLICK);
+        } else if (diff > 40) { 	/* short press, 40 miliseconds */
+            awss_time = 0;
+            aos_post_event(EV_KEY, psgpio->port, VALUE_KEY_CLICK);
+        } else {
+            aos_post_delayed_action(10, key_poll_func, arg);
+        }
+    }
+}
+
+static void key_proc_work(void *arg)
+{
+    aos_schedule_call(key_poll_func, arg);
+}
+
+static void handle_awss_key(void *arg)
+{
+    uint32_t gpio_value;
+
+    hal_gpio_input_get((gpio_dev_t*)arg, &gpio_value);
+    if (gpio_value == 0 && awss_time == 0) {
+        awss_time = aos_now_ms();
+        aos_loop_schedule_work(0, key_proc_work, arg, NULL, NULL);
+    }
+}
+
+static void board_gpio_init(void)
+{
+		int i;
+    for (i = 0; i < i32BoardMaxGPIONum; ++i)
+        hal_gpio_init(&board_gpio_table[i]);
+}
+
+static void board_button_init(void)
+{		
+		//SW2
+		hal_gpio_enable_irq(&board_gpio_table[16], IRQ_TRIGGER_FALLING_EDGE, handle_awss_key, (void*)&board_gpio_table[16]);		
+		
+		//SW3
+		hal_gpio_enable_irq(&board_gpio_table[17], IRQ_TRIGGER_FALLING_EDGE, handle_awss_key, (void*)&board_gpio_table[17]);		
+}
+
 void board_init(void)
 {
+		board_gpio_init();
+		board_button_init();
+	
     board_partition_init();
     board_cli_init();
 }
