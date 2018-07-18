@@ -268,9 +268,9 @@ exit_hal_get_serial_s:
 	if ( !(pserial_s=hal_get_serial_s ( uart )) )
 		goto exit_hal_uart_init;
 
-    // found UARTNAME from the two PinName.
-    uart_tx = pinmap_peripheral(pserial_s->pin_tx, PinMap_UART_TX);
-    uart_rx = pinmap_peripheral(pserial_s->pin_rx, PinMap_UART_RX);
+  // found UARTNAME from the two PinName.
+  uart_tx = pinmap_peripheral(pserial_s->pin_tx, PinMap_UART_TX);
+  uart_rx = pinmap_peripheral(pserial_s->pin_rx, PinMap_UART_RX);
 
 	// Get final UARTName
 	s_UartName = (UARTName) pinmap_merge(uart_tx, uart_rx);
@@ -278,8 +278,8 @@ exit_hal_get_serial_s:
 		goto exit_hal_uart_init;
 
 	// Find entry by UARTNAME
-    if ( !(modinit = get_modinit(s_UartName, uart_modinit_tab)) ) 
-   		goto exit_hal_uart_init;
+  if ( !(modinit = get_modinit(s_UartName, uart_modinit_tab)) ) 
+  	goto exit_hal_uart_init;
 
 	var = (struct nu_uart_var *) modinit->var;
 	if (! var->ref_cnt) {
@@ -340,7 +340,6 @@ exit_hal_get_serial_s:
 
 		/* Link parent and children. */
 		var->obj = pserial_s;
-		uart->priv = (void*)var ;
 
     }
    
@@ -376,16 +375,21 @@ exit_hal_uart_init:
 int32_t hal_uart_send(uart_dev_t *uart, const void *data, uint32_t size, uint32_t timeout)
 {
 	struct serial_s* pserial_s;
-    struct nu_uart_var *var;
+  struct nu_uart_var *var;
 	UART_T* pUart;
-    kstat_t stat = RHINO_SUCCESS;
+  kstat_t stat = RHINO_SUCCESS;
 
-    if ( !uart || !uart->priv )
+  if ( !uart )
 		goto exit_hal_uart_send;
 
-	var = (struct nu_uart_var *)uart->priv;
+	pserial_s = hal_get_serial_s ( uart );
+	if ( !pserial_s )
+		goto exit_hal_uart_send;
+	
+	var = (struct nu_uart_var *)uart_modinit_tab[uart->port].var;
+	
 	/* Initialized? */
-	if ( !var->obj ) goto exit_hal_uart_send;
+	if ( !var->ref_cnt ) goto exit_hal_uart_send;
 
 	pserial_s = var->obj;
 	pUart = (UART_T *) NU_MODBASE(pserial_s->uart);
@@ -430,16 +434,20 @@ exit_hal_uart_send:
 int32_t hal_uart_recv(uart_dev_t *uart, void *data, uint32_t expect_size, uint32_t timeout)
 {
 	struct serial_s* pserial_s;
-    struct nu_uart_var *var;
+  struct nu_uart_var *var;
 	UART_T* pUart;
 
-    if ( !uart || !uart->priv )
+  if ( !uart )
 		goto exit_hal_uart_recv;
 
-	var = (struct nu_uart_var *)uart->priv;
+	pserial_s = hal_get_serial_s ( uart );
+	if ( !pserial_s )
+		goto exit_hal_uart_recv;
+	
+	var = (struct nu_uart_var *)uart_modinit_tab[uart->port].var;
 
 	/* Initialized? */
-	if ( !var->obj ) goto exit_hal_uart_recv;
+	if ( !var->ref_cnt ) goto exit_hal_uart_recv;
 
 	pserial_s = var->obj;
 	pUart = (UART_T *) NU_MODBASE(pserial_s->uart);
@@ -479,7 +487,7 @@ int32_t hal_uart_recv_II(uart_dev_t *uart, void *data, uint32_t expect_size,
 	//Todo: implement timeout feature.
 
 	if ( !got )
-		*recv_size = got;
+		*recv_size = expect_size;
 	else
 		goto exit_hal_uart_recv_II;
 
@@ -505,17 +513,22 @@ int32_t hal_uart_finalize(uart_dev_t *uart)
 	struct nu_uart_var *var;
 	UART_T* pUart;
 
-  if ( !uart || !uart->priv )
+  if ( !uart )
 		goto exit_hal_uart_finalize;
 
-	var = (struct nu_uart_var *)uart->priv;
+	pserial_s = hal_get_serial_s ( uart );
+	if ( !pserial_s )
+		goto exit_hal_uart_finalize;
+
+	var = (struct nu_uart_var *)uart_modinit_tab[uart->port].var;
+
 	/* Initialized? */
-	if ( !var->obj ) goto exit_hal_uart_finalize;
+	if ( !var->ref_cnt ) goto exit_hal_uart_finalize;
 
-	pserial_s = var->obj;
 	pUart = (UART_T *) NU_MODBASE(pserial_s->uart);
-
+	
 	var->ref_cnt --;
+	
 	if (! var->ref_cnt) {
 		
 		do {
@@ -533,7 +546,7 @@ int32_t hal_uart_finalize(uart_dev_t *uart)
 		krhino_mutex_del(&var->port_mutex);
 
 		/* Unlink parent and children. */
-		var->obj = uart->priv = NULL ;
+		var->obj = NULL ;
 	}
 
 	if (! var->ref_cnt) {

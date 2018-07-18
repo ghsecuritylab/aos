@@ -82,6 +82,7 @@ $(NAME)_SOURCES += aos/soc_impl.c \
                    hal/hal_i2c.c \
                    hal/hal_interrupt.c \
                    hal/hal_pwm.c \
+                   hal/hal_flash.c \
                    hal/hal_qspi.c
                    
 
