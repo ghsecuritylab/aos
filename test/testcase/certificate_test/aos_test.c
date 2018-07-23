@@ -935,7 +935,7 @@ static void task_loop1(void *arg)
     int ret = -1;
     aos_loop_t loop = NULL;
 
-    g_var = 0;
+ //Wayne   g_var = 0;
     printf("task name: %s\r\n", aos_task_name());
 
     loop = aos_loop_init();
@@ -1057,7 +1057,7 @@ CASE(test_yloop, aos_2_009)
     for(i=0; i<TEST_CONFIG_YLOOP_LOOP_COUNT; i++) {
         aos_sem_wait(&g_sem_taskexit_sync, -1);
     }
-    printf("%d tasks exit!\r\n", TEST_CONFIG_YLOOP_LOOP_COUNT);
+    printf("%d tasks exit!, final g_var is %d. \r\n", TEST_CONFIG_YLOOP_LOOP_COUNT, g_var);
     ASSERT_EQ(g_var, TEST_CONFIG_YLOOP_LOOP_COUNT);
     aos_sem_free(&g_sem_taskexit_sync);
 }
