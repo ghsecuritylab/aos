@@ -38,11 +38,9 @@ static void stduart_init(void)
     hal_uart_init(&uart_0);
 }
 
+void soc_init(void);
 void numicro_soc_init(void)
 {
-	  /* HAL Initialization */
-    // HAL_Init();
-
     /* Configure the system clock */
    	soc_init();
 

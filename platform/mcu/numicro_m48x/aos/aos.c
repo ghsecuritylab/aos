@@ -29,7 +29,7 @@ static void var_init()
 static void sys_init(void)
 {
     /* Call initialize functions in every board implementation. */
-	numicro_soc_init();
+		numicro_soc_init();
 
     /* Lock protected registers */
     //SYS_LockReg();
