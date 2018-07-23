@@ -59,7 +59,7 @@ static int32_t platform_flash_erase(uint32_t addr_start, uint32_t lengthInBytes)
 
 
 	for ( i=0; i<page_num; i++ )
-	 if (	FMC_Erase ( addr_start+i*FMC_FLASH_PAGE_SIZE ) < 0 )
+	 if (	(ret=FMC_Erase ( addr_start+i*FMC_FLASH_PAGE_SIZE )) < 0 )
 		 break;
 	 
 	if ( i != page_num )
