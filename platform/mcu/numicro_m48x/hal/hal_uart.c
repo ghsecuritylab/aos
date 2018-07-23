@@ -29,7 +29,7 @@ struct nu_uart_var {
     uint32_t    fifo_size_rx;
 		kmutex_t 	port_mutex;
     ksem_t 		recv_sem;
-	ksem_t 		send_sem;
+		ksem_t 		send_sem;
 };
 
 static struct nu_uart_var uart0_var = {
@@ -83,37 +83,61 @@ static const struct nu_modinit_s uart_modinit_tab[] =
 
 static uint32_t uart_modinit_mask = 0;
 
-static void uart_irq(struct serial_s *obj)
+
+static void hal_uart_rxbuf_irq (struct serial_s *obj )
 {
+		BufIndictor_s* psBufdictor = &obj->sBufIndictor_RX;
     UART_T *uart_base = (UART_T *) NU_MODBASE(obj->uart);
-#if 0
+		if ( psBufdictor->pu8Buf ) 
+		{
+				do {
+						if ( psBufdictor->size < psBufdictor->length )
+						{
+							psBufdictor->pu8Buf[psBufdictor->size] = (uint8_t)uart_base->DAT ;
+							psBufdictor->size++;
+						}
+						if ( psBufdictor->size == psBufdictor->length ) {
+							if ( psBufdictor->RxMissionDone )
+								psBufdictor->RxMissionDone(psBufdictor->priv);
+							break;
+						}						
+				} while ( (uart_base->FIFOSTS & UART_FIFOSTS_RXEMPTY_Msk) != 0 );
+		}
+}
+
+static void uart_irq(struct nu_uart_var* psNuUartVar)
+{
+		struct serial_s *obj = psNuUartVar->obj;
+    UART_T *uart_base = (UART_T *) NU_MODBASE(obj->uart);
+	
     if (uart_base->INTSTS & (UART_INTSTS_RDAINT_Msk | UART_INTSTS_RXTOINT_Msk)) {
         // Simulate clear of the interrupt flag. Temporarily disable the interrupt here and to be recovered on next read.
-        UART_DISABLE_INT(uart_base, (UART_INTEN_RDAIEN_Msk | UART_INTEN_RXTOIEN_Msk));
-        if (obj->serial.irq_handler) {
-            ((uart_irq_handler) obj->serial.irq_handler)(obj->serial.irq_id, RxIrq);
-        }
+        // UART_DISABLE_INT(uart_base, (UART_INTEN_RDAIEN_Msk | UART_INTEN_RXTOIEN_Msk));
+        hal_uart_rxbuf_irq(obj);
     }
 
+#if 0
     if (uart_base->INTSTS & UART_INTSTS_THREINT_Msk) {
         // Simulate clear of the interrupt flag. Temporarily disable the interrupt here and to be recovered on next write.
         UART_DISABLE_INT(uart_base, UART_INTEN_THREIEN_Msk);
         if (obj->serial.irq_handler) {
             ((uart_irq_handler) obj->serial.irq_handler)(obj->serial.irq_id, TxIrq);
         }
-    }
+    }		
 #endif
+		
     // FIXME: Ignore all other interrupt flags. Clear them. Otherwise, program will get stuck in interrupt.
     uart_base->INTSTS = uart_base->INTSTS;
     uart_base->FIFOSTS = uart_base->FIFOSTS;
 }
 
-void UART0_IRQHandler (void) { uart_irq(uart0_var.obj); }
-void UART1_IRQHandler (void) { uart_irq(uart1_var.obj); }
-void UART2_IRQHandler (void) { uart_irq(uart2_var.obj); }
-void UART3_IRQHandler (void) { uart_irq(uart3_var.obj); }
-void UART4_IRQHandler (void) { uart_irq(uart4_var.obj); }
-void UART5_IRQHandler (void) { uart_irq(uart5_var.obj); }
+void UART0_IRQHandler (void) { uart_irq(&uart0_var); }
+void UART1_IRQHandler (void) { uart_irq(&uart1_var); }
+void UART2_IRQHandler (void) { uart_irq(&uart2_var); }
+void UART3_IRQHandler (void) { uart_irq(&uart3_var); }
+void UART4_IRQHandler (void) { uart_irq(&uart4_var); }
+void UART5_IRQHandler (void) { uart_irq(&uart5_var); }
+
 
 /**
  * Configure UART flowcontrol
@@ -335,8 +359,10 @@ exit_hal_get_serial_s:
 			break;
 		}
 
+		NVIC_EnableIRQ(modinit->irq_n);
+
 		/* Enable Interrupt */
-		UART_ENABLE_INT(pUart, UART_INTEN_RDAIEN_Msk);
+    //UART_ENABLE_INT(pUart, (UART_INTEN_RDAIEN_Msk));
 
 		/* Link parent and children. */
 		var->obj = pserial_s;
@@ -359,6 +385,13 @@ exit_hal_uart_init:
 		UART_Close(pUart);
 			
 	return HAL_ERROR;	
+}
+
+void hal_uart_done ( void* pdata )
+{
+	ksem_t*  pSem = (ksem_t*)pdata;
+	if ( pSem )
+			krhino_sem_give ( pSem );
 }
 
 /**
@@ -394,8 +427,8 @@ int32_t hal_uart_send(uart_dev_t *uart, const void *data, uint32_t size, uint32_
 	pserial_s = var->obj;
 	pUart = (UART_T *) NU_MODBASE(pserial_s->uart);
 
-    if (timeout == 0)
-        timeout = 0xffffffff;
+  if (timeout == 0)
+      timeout = 0xffffffff;
 
 	pUart = (UART_T *) NU_MODBASE(pserial_s->uart);
 
@@ -420,6 +453,42 @@ exit_hal_uart_send:
 	return HAL_ERROR;
 }
 
+
+int32_t Pfm_UART_Read(struct serial_s *pserial_s, uint8_t pu8RxBuf[], uint32_t u32ReadBytes, uint32_t timeout, ksem_t* pRecvSem)
+{
+		kstat_t stat = RHINO_SUCCESS;
+		UART_T* pUart;
+		int32_t	ret=0;
+	
+		BufIndictor_s *psBufInd = &pserial_s->sBufIndictor_RX;	
+		psBufInd->pu8Buf 				= pu8RxBuf;
+		psBufInd->length				=	u32ReadBytes;
+	
+		psBufInd->size					= 0;
+		psBufInd->RxMissionDone	= hal_uart_done;
+		psBufInd->priv					= (void*)pRecvSem;
+	
+		pUart = (UART_T *) NU_MODBASE(pserial_s->uart);
+
+		/* Enable Interrupt */
+    UART_ENABLE_INT ( pUart, (UART_INTEN_RDAIEN_Msk | UART_INTEN_RXTOIEN_Msk) );
+
+		/* Wait for a interrupt */
+		stat = krhino_sem_take ( pRecvSem, timeout );
+
+		/* Disable Interrupt */
+    UART_DISABLE_INT ( pUart, (UART_INTEN_RDAIEN_Msk | UART_INTEN_RXTOIEN_Msk) );
+	
+		if ( stat == RHINO_SUCCESS )
+				ret = u32ReadBytes ;
+		else
+				ret = psBufInd->size;
+		
+		memset ( psBufInd, 0, sizeof(BufIndictor_s));
+		
+		return ret;
+}
+
 /**
  * Receive data on a UART interface
  *
@@ -435,7 +504,6 @@ int32_t hal_uart_recv(uart_dev_t *uart, void *data, uint32_t expect_size, uint32
 {
 	struct serial_s* pserial_s;
   struct nu_uart_var *var;
-	UART_T* pUart;
 
   if ( !uart )
 		goto exit_hal_uart_recv;
@@ -443,6 +511,9 @@ int32_t hal_uart_recv(uart_dev_t *uart, void *data, uint32_t expect_size, uint32
 	pserial_s = hal_get_serial_s ( uart );
 	if ( !pserial_s )
 		goto exit_hal_uart_recv;
+
+  if (timeout == 0)
+      timeout = 0xffffffff;	
 	
 	var = (struct nu_uart_var *)uart_modinit_tab[uart->port].var;
 
@@ -450,15 +521,11 @@ int32_t hal_uart_recv(uart_dev_t *uart, void *data, uint32_t expect_size, uint32
 	if ( !var->ref_cnt ) goto exit_hal_uart_recv;
 
 	pserial_s = var->obj;
-	pUart = (UART_T *) NU_MODBASE(pserial_s->uart);
 
-	//uint32_t UART_Read(UART_T* uart, uint8_t pu8RxBuf[], uint32_t u32ReadBytes)
-	if ( UART_Read(pUart, (uint8_t*)data, expect_size) != expect_size )
+	if ( Pfm_UART_Read(pserial_s, (uint8_t*)data, expect_size, timeout, &var->recv_sem) != expect_size )
 		goto exit_hal_uart_recv;
-		
-	//Todo: implement timeout feature.
 
-    return HAL_OK;
+  return HAL_OK;
     
 exit_hal_uart_recv:
 
