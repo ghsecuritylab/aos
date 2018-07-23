@@ -935,7 +935,7 @@ static void task_loop1(void *arg)
     int ret = -1;
     aos_loop_t loop = NULL;
 
- //Wayne   g_var = 0;
+    g_var = 0;
     printf("task name: %s\r\n", aos_task_name());
 
     loop = aos_loop_init();
