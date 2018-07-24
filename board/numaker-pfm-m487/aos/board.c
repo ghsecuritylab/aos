@@ -55,7 +55,6 @@ const int i32BoardMaxADCNum  = sizeof( board_analogin ) / sizeof( board_analogin
 /* GPIO */
 struct gpio_s board_gpio [] = 
 {
-	/* Digital-In port */
 	{ .pin = D0 },
 	{ .pin = D1 },
 	{ .pin = D2 },
@@ -74,6 +73,9 @@ struct gpio_s board_gpio [] =
 	{ .pin = D15 },	
 	{ .pin = SW2 },	
 	{ .pin = SW3 },	
+	{ .pin = LED_RED },	
+	{ .pin = LED_YELLOW },
+	{ .pin = LED_GREEN },
 };
 const int i32BoardMaxGPIONum  = sizeof( board_gpio ) / sizeof( board_gpio[0] );
 
@@ -152,8 +154,11 @@ gpio_dev_t board_gpio_table[] =
     {13, OUTPUT_PUSH_PULL, NULL},
     {14, OUTPUT_PUSH_PULL, NULL},
     {15, OUTPUT_PUSH_PULL, NULL},
-    {16, IRQ_MODE, 				NULL},//16
-    {17, IRQ_MODE, 				NULL},
+    {16, IRQ_MODE, 				 NULL},//16
+    {17, IRQ_MODE, 				 NULL},
+    {18, OUTPUT_PUSH_PULL, NULL},
+    {19, OUTPUT_PUSH_PULL, NULL},
+    {20, OUTPUT_PUSH_PULL, NULL},
 };
 
 /* Logic partition on flash devices */
@@ -267,10 +272,21 @@ static void board_button_init(void)
 		hal_gpio_enable_irq(&board_gpio_table[17], IRQ_TRIGGER_FALLING_EDGE, handle_awss_key, (void*)&board_gpio_table[17]);		
 }
 
+static void board_leds_init(void)
+{
+		//LED_RED
+		hal_gpio_output_low(&board_gpio_table[18]);
+		//LED_YELLOW
+		hal_gpio_output_low(&board_gpio_table[19]);
+		//LED_GREEN
+		hal_gpio_output_low(&board_gpio_table[20]);
+}
+
 void board_init(void)
 {
 		board_gpio_init();
 		board_button_init();
+		board_leds_init();
 	
     board_partition_init();
     board_cli_init();

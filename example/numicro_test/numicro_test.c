@@ -12,12 +12,22 @@
 #define DEF_TEST_RTC 	0 
 #define DEF_TEST_BTN 	0
 #define DEF_TEST_DO		1
+#define DEF_TEST_ADC	1
 
 uint8_t pngbuf [ 32 ];
 random_dev_t 	g_sRngDev;
 wdg_dev_t 		g_sWdtDev;
 rtc_dev_t 		g_sRtcDev;
 rtc_time_t		g_sRtcTimeData;
+adc_dev_t			g_sAdcDev[] = 
+{
+    {0,  0, NULL},//0
+    {1,  0, NULL},  
+    {2,  0, NULL},     
+    {3,  0, NULL},     
+    {4,  0, NULL},       
+    {5,  0, NULL},       
+};
 
 static void print_pngbuf ( uint8_t* pbuf, int length )
 {
@@ -69,7 +79,10 @@ static digitalout_test()
 	static int toggle=0;
 	
 	for (i = 0; i < i32BoardMaxGPIONum; ++i)
-		hal_gpio_output_toggle(&board_gpio_table[i]);
+	{
+		if ( board_gpio_table[i].config >= OUTPUT_PUSH_PULL )
+			hal_gpio_output_toggle(&board_gpio_table[i]);
+	}
 
 	#if 0
 	for (i = 0; i < i32BoardMaxGPIONum; ++i)
@@ -82,6 +95,22 @@ static digitalout_test()
 	toggle = ~toggle;
 	#endif
 }	
+
+static adc_test () 
+{
+	if (DEF_TEST_ADC)
+	{
+		int i=0;
+		uint16_t u16data;
+		printf("\r\n");		
+		for (i = 0; i < i32BoardMaxADCNum; ++i)
+		{
+			hal_adc_value_get(&g_sAdcDev[i], (void*)&u16data, 0);
+			printf("ADC Channel [%d] -> %d\r\n", i, u16data );
+		}
+		printf("\r\n");		
+	}	
+}
 
 
 static void testcase_run(){
@@ -97,7 +126,13 @@ static void testcase_run(){
 
 	if (DEF_TEST_DO)
 		digitalout_test();
+
+	if (DEF_TEST_ADC)
+		adc_test();
+	
 }
+
+static int g_interval=100;
 
 void key_process(input_event_t *eventinfo, void *priv_data)
 {
@@ -107,12 +142,15 @@ void key_process(input_event_t *eventinfo, void *priv_data)
 
     LOG("[%d %d %d %d]\n" , eventinfo->time, eventinfo->type, eventinfo->code, eventinfo->value);
     if (eventinfo->code == 16) {
+				if (g_interval>0)
+					g_interval -= 50;
         if (eventinfo->value == VALUE_KEY_CLICK) {
             LOG("SW2 press do_active\n");
         } else if (eventinfo->value == VALUE_KEY_LTCLICK) {
             LOG("SW2 press do_reset\n");
         }
     } else if (eventinfo->code == 17) {
+				g_interval += 50;
         if (eventinfo->value == VALUE_KEY_CLICK) {
             LOG("SW3 press do_active\n");
         } else if (eventinfo->value == VALUE_KEY_LTCLICK) {
@@ -157,6 +195,13 @@ static void testcase_init() {
 	// SW2/SW3
 	if (DEF_TEST_DO)
 			aos_register_event_filter(EV_KEY, key_process, NULL);
+
+	if (DEF_TEST_ADC)
+	{
+		int i=0;
+		for (i = 0; i < i32BoardMaxADCNum; ++i)
+			hal_adc_init(&g_sAdcDev[i]);		
+	}	
 }
 
 static void app_delayed_action(void *arg)
@@ -165,7 +210,7 @@ static void app_delayed_action(void *arg)
 		
 	testcase_run();
 
-	aos_post_delayed_action(100, app_delayed_action, NULL);
+	aos_post_delayed_action(g_interval, app_delayed_action, NULL);
 }
 
 int application_start(int argc, char *argv[])

@@ -17,12 +17,6 @@
 #include "pinmap.h"
 #include "PortNames.h"
 
-static void halt_on_error_found(const char* funcname, const char* str, uint32_t para)
-{
-        printf("[%s] %s %x\r\n", funcname, str, para);
-        while(1);
-}
-
 /**
  * Configure pin multi-function
  */

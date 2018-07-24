@@ -42,6 +42,8 @@ void     pinmap_pinout    (PinName pin, const PinMap *map);
 uint32_t pinmap_find_peripheral(PinName pin, const PinMap* map);
 uint32_t pinmap_find_function(PinName pin, const PinMap* map);
 
+void halt_on_error_found(const char* funcname, const char* str, uint32_t para);
+
 #ifdef __cplusplus
 }
 #endif
