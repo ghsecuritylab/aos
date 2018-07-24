@@ -112,8 +112,9 @@ static void uart_irq(struct nu_uart_var* psNuUartVar)
 	
     if (uart_base->INTSTS & (UART_INTSTS_RDAINT_Msk | UART_INTSTS_RXTOINT_Msk)) {
         // Simulate clear of the interrupt flag. Temporarily disable the interrupt here and to be recovered on next read.
-        // UART_DISABLE_INT(uart_base, (UART_INTEN_RDAIEN_Msk | UART_INTEN_RXTOIEN_Msk));
+        UART_DISABLE_INT(uart_base, (UART_INTEN_RDAIEN_Msk | UART_INTEN_RXTOIEN_Msk));
         hal_uart_rxbuf_irq(obj);
+				UART_ENABLE_INT ( uart_base, (UART_INTEN_RDAIEN_Msk | UART_INTEN_RXTOIEN_Msk) );			
     }
 
 #if 0
@@ -454,7 +455,7 @@ exit_hal_uart_send:
 }
 
 
-int32_t Pfm_UART_Read(struct serial_s *pserial_s, uint8_t pu8RxBuf[], uint32_t u32ReadBytes, uint32_t timeout, ksem_t* pRecvSem)
+int32_t platform_uart_read(struct serial_s *pserial_s, uint8_t pu8RxBuf[], uint32_t u32ReadBytes, uint32_t timeout, ksem_t* pRecvSem)
 {
 		kstat_t stat = RHINO_SUCCESS;
 		UART_T* pUart;
@@ -489,6 +490,12 @@ int32_t Pfm_UART_Read(struct serial_s *pserial_s, uint8_t pu8RxBuf[], uint32_t u
 		return ret;
 }
 
+int32_t platform_uart_getc(struct serial_s *pserial_s, uint8_t pu8RxBuf[])
+{
+		UART_T* pUart = (UART_T *) NU_MODBASE(pserial_s->uart);
+		return UART_Read ( pUart, pu8RxBuf, 1);
+}
+
 /**
  * Receive data on a UART interface
  *
@@ -504,6 +511,8 @@ int32_t hal_uart_recv(uart_dev_t *uart, void *data, uint32_t expect_size, uint32
 {
 	struct serial_s* pserial_s;
   struct nu_uart_var *var;
+
+	int count=0;
 
   if ( !uart )
 		goto exit_hal_uart_recv;
@@ -522,7 +531,12 @@ int32_t hal_uart_recv(uart_dev_t *uart, void *data, uint32_t expect_size, uint32
 
 	pserial_s = var->obj;
 
-	if ( Pfm_UART_Read(pserial_s, (uint8_t*)data, expect_size, timeout, &var->recv_sem) != expect_size )
+	if ( expect_size == 1ul )
+		count = platform_uart_getc( pserial_s, (uint8_t*)data );
+	else 
+		count = platform_uart_read(pserial_s, (uint8_t*)data, expect_size, timeout, &var->recv_sem);
+	
+	if ( count != expect_size  )
 		goto exit_hal_uart_recv;
 
   return HAL_OK;
@@ -548,22 +562,39 @@ exit_hal_uart_recv:
 int32_t hal_uart_recv_II(uart_dev_t *uart, void *data, uint32_t expect_size,
                          uint32_t *recv_size, uint32_t timeout)
 {
-	uint32_t got = 0;
+	struct serial_s* pserial_s;
+  struct nu_uart_var *var;
 	
-	got = hal_uart_recv(uart, data, expect_size, timeout);
-	//Todo: implement timeout feature.
+	int count=0;
 
-	if ( !got )
-		*recv_size = expect_size;
-	else
-		goto exit_hal_uart_recv_II;
+  if ( !uart )
+		goto exit_hal_uart_recv_ii;
 
-    return HAL_OK;
+	pserial_s = hal_get_serial_s ( uart );
+	if ( !pserial_s )
+		goto exit_hal_uart_recv_ii;
+
+  if (timeout == 0)
+      timeout = 0xffffffff;	
+	
+	var = (struct nu_uart_var *)uart_modinit_tab[uart->port].var;
+
+	/* Initialized? */
+	if ( !var->ref_cnt ) goto exit_hal_uart_recv_ii;
+
+	pserial_s = var->obj;
+
+	if ( expect_size == 1ul )
+		count = platform_uart_getc ( pserial_s, (uint8_t*)data );
+	else 
+		count = platform_uart_read(pserial_s, (uint8_t*)data, expect_size, timeout, &var->recv_sem);
+	
+	*recv_size = count;
+  return HAL_OK;
     
-exit_hal_uart_recv_II:
-
+exit_hal_uart_recv_ii:
+	*recv_size = 0;
 	return HAL_ERROR;
-
 }
 
 /**
