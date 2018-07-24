@@ -28,7 +28,7 @@ extern "C" {
   Test default aos_2_009 will spend 5 eventfd, cli spend 1 eventfd. I should enlarge the value to avoid
 	AOS kernel certification test failure.
 */
-#define MEMP_NUM_NETCONN     8//(MAX_SOCKETS_TCP + MAX_LISTENING_SOCKETS_TCP + MAX_SOCKETS_UDP)
+#define MEMP_NUM_NETCONN     10//(MAX_SOCKETS_TCP + MAX_LISTENING_SOCKETS_TCP + MAX_SOCKETS_UDP)
 
 #define SAL_TAG  "sal"
 
