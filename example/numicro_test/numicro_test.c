@@ -11,8 +11,10 @@
 #define DEF_TEST_WDT 	0
 #define DEF_TEST_RTC 	0 
 #define DEF_TEST_BTN 	0
-#define DEF_TEST_DO		1
-#define DEF_TEST_ADC	1
+#define DEF_TEST_DO		0
+#define DEF_TEST_BTN	1
+#define DEF_TEST_ADC	0
+#define DEF_TEST_PWM	1
 
 uint8_t pngbuf [ 32 ];
 random_dev_t 	g_sRngDev;
@@ -28,6 +30,24 @@ adc_dev_t			g_sAdcDev[] =
     {4,  0, NULL},       
     {5,  0, NULL},       
 };
+
+pwm_dev_t			g_sPwmDev[] = 
+{
+    {0,  {0.5f,10}, NULL},
+    {1,  {0.5f,10}, NULL},
+    {2,  {0.5f,10}, NULL},
+    {3,  {0.5f,10}, NULL},
+    {4,  {0.5f,10}, NULL},
+    {5,  {0.5f,10}, NULL},
+    {6,  {0.5f,10}, NULL},
+    {7,  {0.5f,10}, NULL},
+    {8,  {0.5f,10}, NULL},
+    {9,  {0.5f,10}, NULL},
+    {10,  {0.5f,10}, NULL},
+    {11,  {0.5f,10}, NULL},		
+};
+
+static int g_interval=100;		//ms
 
 static void print_pngbuf ( uint8_t* pbuf, int length )
 {
@@ -112,6 +132,22 @@ static adc_test ()
 	}	
 }
 
+static pwm_test (int on) 
+{
+	if (DEF_TEST_PWM)
+	{
+		int i=0;
+		for (i = 0; i < i32BoardMaxPWMNum; ++i)
+		{
+			g_sPwmDev[i].config.freq=g_interval;
+			if ( on )
+				hal_pwm_start(&g_sPwmDev[i]);			
+			else
+				hal_pwm_stop(&g_sPwmDev[i]);
+		}
+	}
+}
+
 
 static void testcase_run(){
 
@@ -130,10 +166,8 @@ static void testcase_run(){
 	if (DEF_TEST_ADC)
 		adc_test();
 	
+
 }
-
-static int g_interval=100;
-
 void key_process(input_event_t *eventinfo, void *priv_data)
 {
     if (eventinfo->type != EV_KEY) {
@@ -142,6 +176,8 @@ void key_process(input_event_t *eventinfo, void *priv_data)
 
     LOG("[%d %d %d %d]\n" , eventinfo->time, eventinfo->type, eventinfo->code, eventinfo->value);
     if (eventinfo->code == 16) {
+				if (DEF_TEST_PWM)
+					pwm_test(0);
 				if (g_interval>0)
 					g_interval -= 50;
         if (eventinfo->value == VALUE_KEY_CLICK) {
@@ -150,6 +186,8 @@ void key_process(input_event_t *eventinfo, void *priv_data)
             LOG("SW2 press do_reset\n");
         }
     } else if (eventinfo->code == 17) {
+				if (DEF_TEST_PWM)
+					pwm_test(1);
 				g_interval += 50;
         if (eventinfo->value == VALUE_KEY_CLICK) {
             LOG("SW3 press do_active\n");
@@ -193,15 +231,26 @@ static void testcase_init() {
 	}
 	
 	// SW2/SW3
-	if (DEF_TEST_DO)
+	if (DEF_TEST_BTN)
 			aos_register_event_filter(EV_KEY, key_process, NULL);
 
+	// A0~A5
 	if (DEF_TEST_ADC)
 	{
 		int i=0;
 		for (i = 0; i < i32BoardMaxADCNum; ++i)
 			hal_adc_init(&g_sAdcDev[i]);		
 	}	
+	
+	if (DEF_TEST_PWM)
+	{
+		int i=0;
+		for (i = 0; i < i32BoardMaxPWMNum; ++i)
+		{
+			hal_pwm_init(&g_sPwmDev[i]);
+			hal_pwm_start(&g_sPwmDev[i]);			
+		}
+	}
 }
 
 static void app_delayed_action(void *arg)

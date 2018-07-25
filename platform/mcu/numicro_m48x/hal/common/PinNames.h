@@ -110,6 +110,21 @@ typedef enum {
     I2C_SCL = D15,
     I2C_SDA = D14,
     
+		EPWM1_CH3 = D2,		//PC_9
+		EPWM1_CH2 = D3,		//PC_10
+		EPWM1_CH1 = D4,		//PC_11
+		EPWM1_CH0 = D5,		//PC_12
+		EPWM0_CH3 = D13,	//PA_2
+		EPWM0_CH2 = D7,		//PE_5
+		
+		EPWM0_CH0 = D8,		//PA_5
+		EPWM0_CH1 = D9,		//PA_4
+		EPWM0_CH4 = D12,	//PA_1
+		EPWM0_CH5 = D11,	//PA_0
+
+//		EPWM0_CH3 = D6,	//PE_4
+//		EPWM0_CH2 = D10,//PA_3
+
     // Note: board-specific
     // UART naming
     USBTX = PB_13,

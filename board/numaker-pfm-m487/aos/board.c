@@ -82,20 +82,20 @@ const int i32BoardMaxGPIONum  = sizeof( board_gpio ) / sizeof( board_gpio[0] );
 /* PWM port-M & channel-N */
 struct pwmout_s board_pwm [] = 
 {
-	{	.pwm = PWM_0_0,  .pin = PA_5	},
-	{	.pwm = PWM_0_1,  .pin = PA_4	},
-	{	.pwm = PWM_0_2,  .pin = PA_3	},
-	{	.pwm = PWM_0_3,  .pin = PA_0	},
-	{	.pwm = PWM_0_4,  .pin = PA_1	},
-	{	.pwm = PWM_0_5,  .pin = PA_2	},
+	{	.pwm = PWM_0_0,  .pin = EPWM0_CH0	},
+	{	.pwm = PWM_0_1,  .pin = EPWM0_CH1	},
+	{	.pwm = PWM_0_2,  .pin = EPWM0_CH2	},
+	{	.pwm = PWM_0_3,  .pin = EPWM0_CH3	},
+	{	.pwm = PWM_0_4,  .pin = EPWM0_CH4	},
+	{	.pwm = PWM_0_5,  .pin = EPWM0_CH5	},
 
-	{	.pwm = PWM_1_0,  .pin = PC_12	},
-	{	.pwm = PWM_1_1,  .pin = PC_11	},
-	{	.pwm = PWM_1_2,  .pin = PC_10	},
-	{	.pwm = PWM_1_3,  .pin = PC_9	},
-	
-	//{	.pwm = PWM_0_3,  .pin = PE_4	}, //The same with PA_0.
-	//{	.pwm = PWM_0_2,  .pin = PE_5	}, //The same with PA_3.
+	{	.pwm = PWM_1_0,  .pin = EPWM1_CH0	},
+	{	.pwm = PWM_1_1,  .pin = EPWM1_CH1	},
+	{	.pwm = PWM_1_2,  .pin = EPWM1_CH2	},
+	{	.pwm = PWM_1_3,  .pin = EPWM1_CH3	},
+
+	{	.pwm = PWM_0_3,  .pin = D6	}, //The same with EPWM0_CH3.
+	{	.pwm = PWM_0_2,  .pin = D10	}, //The same with EPWM0_CH2.
 };
 const int i32BoardMaxPWMNum  = sizeof( board_pwm ) / sizeof( board_pwm[0] );
 

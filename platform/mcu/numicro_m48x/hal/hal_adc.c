@@ -100,7 +100,7 @@ static void platform_analogin_finalize(struct analogin_s *obj )
 	}	
 }
 
-static struct serial_s* hal_get_analogin_s ( adc_dev_t *adc )
+static struct analogin_s* hal_get_analogin_s ( adc_dev_t *adc )
 {
 	if ( !(adc) || (adc->port >= i32BoardMaxADCNum) )
 		goto exit_hal_get_analogin_s;
