@@ -22,6 +22,85 @@
 #include <hal/hal.h>
 #include "board.h"
 
+static const struct nu_modinit_s dac_modinit_tab[] = {
+    {DAC_0, DAC_MODULE, 0, 0, DAC_RST, DAC_IRQn, NULL},
+    {DAC_1, DAC_MODULE, 0, 0, DAC_RST, DAC_IRQn, NULL},
+};
+
+static uint32_t dac_modinit_mask = 0;
+
+static int32_t platform_analogout_init(struct analogout_s *obj, PinName pin )
+{
+		struct nu_modinit_s *modinit;
+	
+		if ( obj->dac != (DACName) pinmap_peripheral(pin, PinMap_ADC))
+			goto exit_platform_analogout_init;
+
+		if ( (modinit = get_modinit(obj->dac, dac_modinit_tab)) == NULL )
+			goto exit_platform_analogout_init;
+
+		if ( modinit->modname != (int) obj->dac )
+			goto exit_platform_analogout_init;
+
+    DAC_T *dac_base = (DAC_T *) NU_MODBASE(obj->dac);
+
+    if (! dac_modinit_mask) {
+        // Reset this module if no channel enabled
+        SYS_ResetModule(modinit->rsetidx);
+
+        // Select clock source of paired channels
+        CLK_SetModuleClock(modinit->clkidx, modinit->clksrc, modinit->clkdiv);
+        // Enable clock of paired channels
+        CLK_EnableModuleClock(modinit->clkidx);
+
+				/* This function make DAC module be ready to convert. */
+				DAC_Open(dac_base, 0, DAC_SOFTWARE_TRIGGER );
+
+				/* The DAC conversion settling time is 1us */
+				DAC_SetDelayTime(dac_base, 1);
+			
+				DAC_ENABLE_RIGHT_ALIGN(dac_base);
+    }
+
+    uint32_t modinx =  NU_MODINDEX(obj->dac);
+
+    // Wire pinout
+    pinmap_pinout(pin, PinMap_DAC);
+
+		/* Disable digital input path of analog pin DAC0_OUT to prevent leakage */
+    GPIO_DISABLE_DIGITAL_PATH( NU_PORT_BASE(NU_PINNAME_TO_PORT(pin)), (1ul << NU_PINNAME_TO_PIN(pin) ));
+		
+    dac_modinit_mask |= 1 << modinx;
+
+		return HAL_OK;
+		
+exit_platform_analogout_init:
+		
+		return HAL_ERROR;
+}
+
+static void platform_analogout_finalize(struct analogout_s *obj )
+{
+	uint32_t modinx =  NU_MODINDEX(obj->dac);
+	dac_modinit_mask &= ~(1 << modinx);
+	if ( !dac_modinit_mask )
+	{
+		DAC_T *dac_base = (DAC_T *) NU_MODBASE(obj->dac);
+		DAC_Close(dac_base, 0);
+	}
+}
+
+static struct analogout_s* hal_get_analogout_s ( dac_dev_t *dac )
+{
+	if ( !(dac) || (dac->port >= i32BoardMaxDACNum) )
+		goto exit_hal_get_analogout_s;
+
+	return (struct analogin_s*)&board_analogout[dac->port];
+
+exit_hal_get_analogout_s:
+	return NULL;
+}
+
 /**
  * Initialises an dac interface
  *
@@ -31,7 +110,15 @@
  */
 int32_t hal_dac_init(dac_dev_t *dac)
 {
-	return HAL_OK;
+	struct analogout_s* obj = hal_get_analogout_s ( dac );
+	
+	if ( !obj )
+		goto exit_hal_dac_init;
+	
+	return platform_analogout_init(obj, obj->pin );
+
+exit_hal_dac_init:
+	return HAL_ERROR;
 }
 
 /**
@@ -44,7 +131,23 @@ int32_t hal_dac_init(dac_dev_t *dac)
  */
 int32_t hal_dac_start(dac_dev_t *dac, uint32_t channel)
 {
+	struct analogout_s* obj = hal_get_analogout_s ( dac );
+	struct nu_modinit_s *modinit;	
+	DAC_T *dac_base = NULL;
+	
+	if ( !obj || !(modinit = get_modinit(obj->dac, dac_modinit_tab)) )
+		goto exit_hal_dac_start;
+
+	dac_base = (DAC_T *) NU_MODBASE(obj->dac);
+	
+	/* Start A/D conversion */
+	dac_base->SWTRG = DAC_SWTRG_SWTRG_Msk;
+	
 	return HAL_OK;
+
+exit_hal_dac_start:
+	
+	return HAL_ERROR;
 }
 
 /**
@@ -57,7 +160,23 @@ int32_t hal_dac_start(dac_dev_t *dac, uint32_t channel)
  */
 int32_t hal_dac_stop(dac_dev_t *dac, uint32_t channel)
 {
+	struct analogout_s* obj = hal_get_analogout_s ( dac );
+	struct nu_modinit_s *modinit;	
+	DAC_T *dac_base = NULL;
+	
+	if ( !obj || !(modinit = get_modinit(obj->dac, dac_modinit_tab)) )
+		goto exit_hal_dac_stop;
+
+	dac_base = (DAC_T *) NU_MODBASE(obj->dac);
+	
+	/* Start A/D conversion */
+	dac_base->SWTRG = ~DAC_SWTRG_SWTRG_Msk;
+	
 	return HAL_OK;
+
+exit_hal_dac_stop:
+	
+	return HAL_ERROR;	
 }
 
 /**
@@ -71,7 +190,25 @@ int32_t hal_dac_stop(dac_dev_t *dac, uint32_t channel)
  */
 int32_t hal_dac_set_value(dac_dev_t *dac, uint32_t channel, uint32_t data)
 {
+	struct analogout_s* obj = hal_get_analogout_s ( dac );
+	struct nu_modinit_s *modinit;	
+	DAC_T *dac_base = NULL;
+		
+	if ( !obj || !(modinit = get_modinit(obj->dac, dac_modinit_tab)) )
+		goto exit_hal_dac_set_value;
+	
+	dac_base = (DAC_T *) NU_MODBASE(obj->dac);
+	
+	/* Set DAC 12-bit holding data */
+	DAC_WRITE_DATA(dac_base, 0, (uint16_t)(data&0xffff));
+
+	/* Start A/D conversion */
+	DAC_START_CONV(dac_base);
+	
 	return HAL_OK;
+
+exit_hal_dac_set_value:
+	return HAL_ERROR;	
 }
 
 /**
@@ -84,7 +221,20 @@ int32_t hal_dac_set_value(dac_dev_t *dac, uint32_t channel, uint32_t data)
  */
 int32_t hal_dac_get_value(dac_dev_t *dac, uint32_t channel)
 {
-	return HAL_OK;
+	struct analogout_s* obj = hal_get_analogout_s ( dac );
+	DAC_T *dac_base = NULL;
+	struct nu_modinit_s *modinit;	
+
+	if ( !obj || !(modinit = get_modinit(obj->dac, dac_modinit_tab)) )
+		goto exit_hal_dac_get_value;
+	
+	dac_base = (DAC_T *) NU_MODBASE(obj->dac);
+
+	return DAC_READ_DATA(dac_base, 0);
+
+exit_hal_dac_get_value:
+	
+	return HAL_ERROR;
 }
 
 /**
@@ -96,5 +246,15 @@ int32_t hal_dac_get_value(dac_dev_t *dac, uint32_t channel)
  */
 int32_t hal_dac_finalize(dac_dev_t *dac)
 {
+	struct analogout_s* obj = hal_get_analogout_s ( dac );
+	if ( !obj )
+		goto exit_hal_dac_finalize;
+	
+	platform_analogout_finalize (obj);
+
 	return HAL_OK;
+	
+exit_hal_dac_finalize:
+
+	return HAL_ERROR;
 }

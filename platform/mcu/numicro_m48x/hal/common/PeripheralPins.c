@@ -37,6 +37,13 @@ const PinMap PinMap_ADC[] = {
     { NC,   NC,    0 }
 };
 
+//*** DAC ***
+const PinMap PinMap_DAC[] = { 
+    { PB_12, 	 DAC_0 , 	 SYS_GPB_MFPH_PB12MFP_DAC0_OUT  },
+    { PB_13, 	 DAC_1 , 	 SYS_GPB_MFPH_PB13MFP_DAC1_OUT  },
+    { NC,   NC,    0 }
+};
+
 //*** I2C_SDA ***
 const PinMap PinMap_I2C_SDA[] = { 
     { PA_0, 	 I2C_2 , 	 SYS_GPA_MFPL_PA0MFP_I2C2_SDA  },

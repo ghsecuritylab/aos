@@ -56,7 +56,7 @@ enum { r0, r1, r2, r3, r12, lr, pc, psr};
  * @details     This function is implement to print r0, r1, r2, r3, r12, lr, pc, psr
  */
 static void stackDump(uint32_t stack[])
-{
+ {
     printf("r0  = 0x%x\n", stack[r0]);
     printf("r1  = 0x%x\n", stack[r1]);
     printf("r2  = 0x%x\n", stack[r2]);

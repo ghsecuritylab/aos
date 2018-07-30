@@ -49,14 +49,10 @@ struct analogin_s {
     PinName pin;
 };
 
-typedef void (*mission_done)(void* pdata);
-typedef struct {
-		uint8_t				*pu8Buf;
-		uint32_t			length;
-		uint32_t			size;
-		mission_done	RxMissionDone;
-		void * 				priv;
-} BufIndictor_s;
+struct analogout_s {
+    DACName dac;
+    PinName pin;
+};
 
 struct serial_s {
     UARTName 	uart;
@@ -64,9 +60,6 @@ struct serial_s {
     PinName 	pin_rx;
     PinName 	pin_rts;
     PinName 	pin_cts;
-		
-		BufIndictor_s sBufIndictor_TX;
-		BufIndictor_s sBufIndictor_RX;
 	
 #if 0    
     uint32_t baudrate;

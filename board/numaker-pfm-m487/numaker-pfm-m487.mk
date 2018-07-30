@@ -39,7 +39,7 @@ sal ?= 1
 no_tls ?= 1
 ifeq (1,$(sal))
 $(NAME)_COMPONENTS += sal
-module ?= wifi.bk7231
+module ?= wifi.mk3060
 #module ?= wifi.esp8266 WTF, build failre
 else
 GLOBAL_DEFINES += CONFIG_NO_TCPIP

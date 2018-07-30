@@ -22,51 +22,48 @@
 #include <hal/hal.h>
 #include "board.h"
 
+#define MAX_BUF_UART_BYTES		1024
+
 struct nu_uart_var {
     uint32_t    ref_cnt;                // Reference count of the H/W module
     struct serial_s *  obj;
-    uint32_t    fifo_size_tx;
-    uint32_t    fifo_size_rx;
-		kmutex_t 	port_mutex;
-    ksem_t 		recv_sem;
-		ksem_t 		send_sem;
+//		kbuf_queue_t	fifo_queue_tx;
+		char *				fifo_buf;
+		kbuf_queue_t	fifo_queue_rx;	
+		kmutex_t 			port_mutex;
+    ksem_t 				recv_sem;
+		ksem_t 				send_sem;	
 };
 
 static struct nu_uart_var uart0_var = {
     .ref_cnt            =   0,
     .obj                =   NULL,
-    .fifo_size_tx       =   16,
-    .fifo_size_rx       =   16,
+		.fifo_buf						=		NULL,
 };
 static struct nu_uart_var uart1_var = {
     .ref_cnt            =   0,
     .obj                =   NULL,
-    .fifo_size_tx       =   16,
-    .fifo_size_rx       =   16,
+		.fifo_buf						=		NULL,
 };
 static struct nu_uart_var uart2_var = {
     .ref_cnt            =   0,
     .obj                =   NULL,
-    .fifo_size_tx       =   16,
-    .fifo_size_rx       =   16,
+		.fifo_buf						=		NULL,
 };
 static struct nu_uart_var uart3_var = {
     .ref_cnt            =   0,
     .obj                =   NULL,
-    .fifo_size_tx       =   16,
-    .fifo_size_rx       =   16,
+		.fifo_buf						=		NULL,
 };
 static struct nu_uart_var uart4_var = {
     .ref_cnt            =   0,
     .obj                =   NULL,
-    .fifo_size_tx       =   16,
-    .fifo_size_rx       =   16,
+		.fifo_buf						=		NULL,
 };
 static struct nu_uart_var uart5_var = {
     .ref_cnt            =   0,
     .obj                =   NULL,
-    .fifo_size_tx       =   16,
-    .fifo_size_rx       =   16,
+		.fifo_buf						=		NULL,
 };
 
 static const struct nu_modinit_s uart_modinit_tab[] = 
@@ -84,36 +81,26 @@ static const struct nu_modinit_s uart_modinit_tab[] =
 static uint32_t uart_modinit_mask = 0;
 
 
-static void hal_uart_rxbuf_irq (struct serial_s *obj )
+static void hal_uart_rxbuf_irq ( struct nu_uart_var* psNuUartVar )
 {
-		BufIndictor_s* psBufdictor = &obj->sBufIndictor_RX;
-    UART_T *uart_base = (UART_T *) NU_MODBASE(obj->uart);
-		if ( psBufdictor->pu8Buf ) 
-		{
-				do {
-						if ( psBufdictor->size < psBufdictor->length )
-						{
-							psBufdictor->pu8Buf[psBufdictor->size] = (uint8_t)uart_base->DAT ;
-							psBufdictor->size++;
-						}
-						if ( psBufdictor->size == psBufdictor->length ) {
-							if ( psBufdictor->RxMissionDone )
-								psBufdictor->RxMissionDone(psBufdictor->priv);
-							break;
-						}						
-				} while ( (uart_base->FIFOSTS & UART_FIFOSTS_RXEMPTY_Msk) != 0 );
-		}
+		uint8_t dat;
+		struct serial_s *obj = psNuUartVar->obj;
+		UART_T *uart_base = (UART_T *) NU_MODBASE(obj->uart);
+		do {
+				dat = (uint8_t)uart_base->DAT;
+				krhino_buf_queue_send(&psNuUartVar->fifo_queue_rx, &dat, 1);
+		} while (0);// ( (uart_base->FIFOSTS & UART_FIFOSTS_RXEMPTY_Msk) != 0 );
 }
 
 static void uart_irq(struct nu_uart_var* psNuUartVar)
 {
-		struct serial_s *obj = psNuUartVar->obj;
+		struct serial_s *obj = psNuUartVar->obj;	
     UART_T *uart_base = (UART_T *) NU_MODBASE(obj->uart);
-	
+
     if (uart_base->INTSTS & (UART_INTSTS_RDAINT_Msk | UART_INTSTS_RXTOINT_Msk)) {
         // Simulate clear of the interrupt flag. Temporarily disable the interrupt here and to be recovered on next read.
         UART_DISABLE_INT(uart_base, (UART_INTEN_RDAIEN_Msk | UART_INTEN_RXTOIEN_Msk));
-        hal_uart_rxbuf_irq(obj);
+        hal_uart_rxbuf_irq ( psNuUartVar );
 				UART_ENABLE_INT ( uart_base, (UART_INTEN_RDAIEN_Msk | UART_INTEN_RXTOIEN_Msk) );			
     }
 
@@ -285,7 +272,7 @@ exit_hal_get_serial_s:
 {
 	struct nu_modinit_s *modinit;
 	struct serial_s* pserial_s;
-    struct nu_uart_var *var;
+  struct nu_uart_var *var;
 	UARTName s_UartName;
 	UART_T* pUart;
 	uint32_t uart_tx, uart_rx;
@@ -324,51 +311,63 @@ exit_hal_get_serial_s:
 
         } while (0);
 
-		if ( krhino_sem_create(&var->send_sem, "uartSend", 0) != RHINO_SUCCESS )
-			goto exit_hal_uart_init;
-
-		if ( krhino_sem_create(&var->recv_sem, "uartReceive", 0) != RHINO_SUCCESS )
-			goto exit_hal_uart_init;
-
-		if ( krhino_mutex_create(&var->port_mutex, "uartMutex") != RHINO_SUCCESS )
-			goto exit_hal_uart_init;
-
-		// Get Uart base address
-		pUart = (UART_T *) NU_MODBASE(s_UartName);
-		
-		/* Set UART Baudrate */
-		UART_Open(pUart, uart->config.baud_rate);
-		
-		// Set line configuration
-		if ( hal_uart_set_lineconf ( pUart, uart->config.data_width, uart->config.stop_bits, uart->config.parity) < 0 )
-			goto exit_hal_uart_init;
-
-		// Set flow-control parameters
-		if ( hal_uart_set_flowcontol ( pUart, uart->config.flow_control ) < 0 )
-			goto exit_hal_uart_init;
-
-		// Check mode parameters
-		switch (uart->config.mode)
-		{
-			case MODE_TX:
-			case MODE_RX:
-			case MODE_TX_RX:
-			break;
+				if ( var->fifo_buf == NULL ) 
+						var->fifo_buf = aos_malloc(MAX_BUF_UART_BYTES);
+				
+				if ( var->fifo_buf == NULL ) {
+						printf("fail to malloc memory size %d at %s %d \r\d", MAX_BUF_UART_BYTES, __FILE__, __LINE__);
+						goto exit_hal_uart_init;
+				}
+				memset( var->fifo_buf, 0, MAX_BUF_UART_BYTES );
 			
-			default:
-				goto exit_hal_uart_init;
-			break;
-		}
+				if ( krhino_buf_queue_create(&var->fifo_queue_rx, "buf_queue_uart", var->fifo_buf, MAX_BUF_UART_BYTES, 1) != RHINO_SUCCESS )
+					goto exit_hal_uart_init;
+				
+				if ( krhino_sem_create(&var->send_sem, "uartSend", 0) != RHINO_SUCCESS )
+					goto exit_hal_uart_init;
 
-		NVIC_EnableIRQ(modinit->irq_n);
+				if ( krhino_sem_create(&var->recv_sem, "uartReceive", 0) != RHINO_SUCCESS )
+					goto exit_hal_uart_init;
 
-		/* Enable Interrupt */
-    //UART_ENABLE_INT(pUart, (UART_INTEN_RDAIEN_Msk));
+				if ( krhino_mutex_create(&var->port_mutex, "uartMutex") != RHINO_SUCCESS )
+					goto exit_hal_uart_init;
 
-		/* Link parent and children. */
-		var->obj = pserial_s;
+				// Get Uart base address
+				pUart = (UART_T *) NU_MODBASE(s_UartName);
+				
+				/* Set UART Baudrate */
+				UART_Open(pUart, uart->config.baud_rate);
+				
+				// Set line configuration
+				if ( hal_uart_set_lineconf ( pUart, uart->config.data_width, uart->config.stop_bits, uart->config.parity) < 0 )
+					goto exit_hal_uart_init;
 
-    }
+				// Set flow-control parameters
+				if ( hal_uart_set_flowcontol ( pUart, uart->config.flow_control ) < 0 )
+					goto exit_hal_uart_init;
+
+				// Check mode parameters
+				switch (uart->config.mode)
+				{
+					case MODE_TX:
+					case MODE_RX:
+					case MODE_TX_RX:
+					break;
+					
+					default:
+						goto exit_hal_uart_init;
+					break;
+				} //switch
+
+				NVIC_EnableIRQ(modinit->irq_n);
+
+				/* Enable Interrupt */
+				UART_ENABLE_INT(pUart, (UART_INTEN_RDAIEN_Msk));
+
+				/* Link parent and children. */
+				var->obj = pserial_s;
+
+    } //if (! var->ref_cnt)
    
     var->ref_cnt ++;
     
@@ -388,13 +387,6 @@ exit_hal_uart_init:
 	return HAL_ERROR;	
 }
 
-void hal_uart_done ( void* pdata )
-{
-	ksem_t*  pSem = (ksem_t*)pdata;
-	if ( pSem )
-			krhino_sem_give ( pSem );
-}
-
 /**
  * Transmit data on a UART interface
  *
@@ -408,6 +400,7 @@ void hal_uart_done ( void* pdata )
  */
 int32_t hal_uart_send(uart_dev_t *uart, const void *data, uint32_t size, uint32_t timeout)
 {
+	struct nu_modinit_s *modinit;
 	struct serial_s* pserial_s;
   struct nu_uart_var *var;
 	UART_T* pUart;
@@ -420,8 +413,11 @@ int32_t hal_uart_send(uart_dev_t *uart, const void *data, uint32_t size, uint32_
 	if ( !pserial_s )
 		goto exit_hal_uart_send;
 	
-	var = (struct nu_uart_var *)uart_modinit_tab[uart->port].var;
+	modinit = get_modinit(pserial_s->uart, uart_modinit_tab);
+	/* Valid? */
+	if ( !modinit ) goto exit_hal_uart_send;
 	
+	var = modinit->var;	
 	/* Initialized? */
 	if ( !var->ref_cnt ) goto exit_hal_uart_send;
 
@@ -455,39 +451,23 @@ exit_hal_uart_send:
 }
 
 
-int32_t platform_uart_read(struct serial_s *pserial_s, uint8_t pu8RxBuf[], uint32_t u32ReadBytes, uint32_t timeout, ksem_t* pRecvSem)
+int32_t platform_uart_read(struct nu_uart_var *var, uint8_t pu8RxBuf[], uint32_t u32ReadBytes, uint32_t timeout, ksem_t* pRecvSem)
 {
-		kstat_t stat = RHINO_SUCCESS;
-		UART_T* pUart;
-		int32_t	ret=0;
-	
-		BufIndictor_s *psBufInd = &pserial_s->sBufIndictor_RX;	
-		psBufInd->pu8Buf 				= pu8RxBuf;
-		psBufInd->length				=	u32ReadBytes;
-	
-		psBufInd->size					= 0;
-		psBufInd->RxMissionDone	= hal_uart_done;
-		psBufInd->priv					= (void*)pRecvSem;
-	
-		pUart = (UART_T *) NU_MODBASE(pserial_s->uart);
+		int32_t	ret=0, i, rev_size=0;
+		int rx_count = 0;
+		struct serial_s *pserial_s = var->obj;	
+		kbuf_queue_t *pBuffer_queue = &var->fifo_queue_rx;
 
-		/* Enable Interrupt */
-    UART_ENABLE_INT ( pUart, (UART_INTEN_RDAIEN_Msk | UART_INTEN_RXTOIEN_Msk) );
-
-		/* Wait for a interrupt */
-		stat = krhino_sem_take ( pRecvSem, timeout );
-
-		/* Disable Interrupt */
-    UART_DISABLE_INT ( pUart, (UART_INTEN_RDAIEN_Msk | UART_INTEN_RXTOIEN_Msk) );
+    for (i = 0; i < u32ReadBytes; i++)
+    {
+//			ret = krhino_buf_queue_recv(pBuffer_queue, timeout, &pu8RxBuf[i], &rev_size);
+			ret = krhino_buf_queue_recv(pBuffer_queue, RHINO_WAIT_FOREVER, &pu8RxBuf[i], &rev_size);
+      if (ret == 0 && (rev_size==1)) {
+          rx_count++;
+      } else break;
+    }
 	
-		if ( stat == RHINO_SUCCESS )
-				ret = u32ReadBytes ;
-		else
-				ret = psBufInd->size;
-		
-		memset ( psBufInd, 0, sizeof(BufIndictor_s));
-		
-		return ret;
+		return rx_count;
 }
 
 int32_t platform_uart_getc(struct serial_s *pserial_s, uint8_t pu8RxBuf[])
@@ -496,6 +476,7 @@ int32_t platform_uart_getc(struct serial_s *pserial_s, uint8_t pu8RxBuf[])
 		return UART_Read ( pUart, pu8RxBuf, 1);
 }
 
+#if 1
 /**
  * Receive data on a UART interface
  *
@@ -509,6 +490,7 @@ int32_t platform_uart_getc(struct serial_s *pserial_s, uint8_t pu8RxBuf[])
  */
 int32_t hal_uart_recv(uart_dev_t *uart, void *data, uint32_t expect_size, uint32_t timeout)
 {
+	struct nu_modinit_s *modinit;	
 	struct serial_s* pserial_s;
   struct nu_uart_var *var;
 
@@ -523,18 +505,21 @@ int32_t hal_uart_recv(uart_dev_t *uart, void *data, uint32_t expect_size, uint32
 
   if (timeout == 0)
       timeout = 0xffffffff;	
-	
-	var = (struct nu_uart_var *)uart_modinit_tab[uart->port].var;
 
+	modinit = get_modinit(pserial_s->uart, uart_modinit_tab);
+	/* Valid? */
+	if ( !modinit ) goto exit_hal_uart_recv;
+	
+	var = (struct nu_uart_var *)modinit->var;
 	/* Initialized? */
 	if ( !var->ref_cnt ) goto exit_hal_uart_recv;
 
 	pserial_s = var->obj;
 
-	if ( expect_size == 1ul )
-		count = platform_uart_getc( pserial_s, (uint8_t*)data );
-	else 
-		count = platform_uart_read(pserial_s, (uint8_t*)data, expect_size, timeout, &var->recv_sem);
+//	if ( expect_size == 1ul )
+//		count = platform_uart_getc( pserial_s, (uint8_t*)data );
+//  else 
+		count = platform_uart_read(var, (uint8_t*)data, expect_size, timeout, &var->recv_sem);
 	
 	if ( count != expect_size  )
 		goto exit_hal_uart_recv;
@@ -546,6 +531,7 @@ exit_hal_uart_recv:
 	return HAL_ERROR;
 
 }
+#endif
 
 /**
  * Receive data on a UART interface
@@ -562,6 +548,7 @@ exit_hal_uart_recv:
 int32_t hal_uart_recv_II(uart_dev_t *uart, void *data, uint32_t expect_size,
                          uint32_t *recv_size, uint32_t timeout)
 {
+	struct nu_modinit_s *modinit;		
 	struct serial_s* pserial_s;
   struct nu_uart_var *var;
 	
@@ -577,17 +564,20 @@ int32_t hal_uart_recv_II(uart_dev_t *uart, void *data, uint32_t expect_size,
   if (timeout == 0)
       timeout = 0xffffffff;	
 	
-	var = (struct nu_uart_var *)uart_modinit_tab[uart->port].var;
-
+	modinit = get_modinit(pserial_s->uart, uart_modinit_tab);
+	/* Valid? */
+	if ( !modinit ) goto exit_hal_uart_recv_ii;
+	
+	var = (struct nu_uart_var *)modinit->var;
 	/* Initialized? */
 	if ( !var->ref_cnt ) goto exit_hal_uart_recv_ii;
 
 	pserial_s = var->obj;
 
-	if ( expect_size == 1ul )
-		count = platform_uart_getc ( pserial_s, (uint8_t*)data );
-	else 
-		count = platform_uart_read(pserial_s, (uint8_t*)data, expect_size, timeout, &var->recv_sem);
+//	if ( expect_size == 1ul )
+//		count = platform_uart_getc ( pserial_s, (uint8_t*)data );
+//	else 
+		count = platform_uart_read(var, (uint8_t*)data, expect_size, timeout, &var->recv_sem);
 	
 	*recv_size = count;
   return HAL_OK;
@@ -618,8 +608,11 @@ int32_t hal_uart_finalize(uart_dev_t *uart)
 	if ( !pserial_s )
 		goto exit_hal_uart_finalize;
 
-	var = (struct nu_uart_var *)uart_modinit_tab[uart->port].var;
+	modinit = get_modinit(pserial_s->uart, uart_modinit_tab);
+	/* Valid? */
+	if ( !modinit ) goto exit_hal_uart_finalize;
 
+	var = (struct nu_uart_var *)modinit->var;
 	/* Initialized? */
 	if ( !var->ref_cnt ) goto exit_hal_uart_finalize;
 
@@ -642,7 +635,8 @@ int32_t hal_uart_finalize(uart_dev_t *uart)
 		krhino_sem_del(&var->send_sem);
 		krhino_sem_del(&var->recv_sem);
 		krhino_mutex_del(&var->port_mutex);
-
+		krhino_buf_queue_del(&var->fifo_queue_rx);
+		
 		/* Unlink parent and children. */
 		var->obj = NULL ;
 	}

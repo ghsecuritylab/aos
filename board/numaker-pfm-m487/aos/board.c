@@ -7,6 +7,7 @@
 /* User-defined */
 /* UART */
 struct serial_s board_uart[] = {
+#if 1
 	{ /* UART PORT 0, STDIO UART, Tx/Rx over Nu-Link's VCOM */
 		.uart 		= UART_0,
 		.pin_tx		= STDIO_UART_TX,
@@ -14,6 +15,7 @@ struct serial_s board_uart[] = {
 		.pin_rts	= NC,
 		.pin_cts	= NC
 	},
+#endif	
 	{ /* UART PORT 1, UART TX/RX in UDO IF */
 		.uart 		= UART_1,
 		.pin_tx		= PB_3,
@@ -51,7 +53,16 @@ struct analogin_s board_analogin [] =
 	{ .adc = ADC_0_1,	.pin = A5	},
 };
 const int i32BoardMaxADCNum  = sizeof( board_analogin ) / sizeof( board_analogin[0] );
-    
+
+/* Analog-Out */
+struct analogout_s board_analogout [] = 
+{
+	/* Analog-In port */
+	{ .dac = DAC_0,	.pin = PB_12	},
+	{ .dac = DAC_1,	.pin = PB_13	},
+};
+const int i32BoardMaxDACNum  = sizeof( board_analogout ) / sizeof( board_analogout[0] );
+
 /* GPIO */
 struct gpio_s board_gpio [] = 
 {
@@ -170,7 +181,7 @@ static void board_partition_init()
     hal_partitions[HAL_PARTITION_APPLICATION].partition_owner            = HAL_FLASH_EMBEDDED;
     hal_partitions[HAL_PARTITION_APPLICATION].partition_description      = "Application";
     hal_partitions[HAL_PARTITION_APPLICATION].partition_start_addr       = FMC_APROM_BASE;	//0x80000, 512k
-    hal_partitions[HAL_PARTITION_APPLICATION].partition_length           = 0x20000;    			//128k bytes
+    hal_partitions[HAL_PARTITION_APPLICATION].partition_length           = 0x40000;    			//128k bytes
     hal_partitions[HAL_PARTITION_APPLICATION].partition_options          = PAR_OPT_READ_EN | PAR_OPT_WRITE_EN;
 
     hal_partitions[HAL_PARTITION_PARAMETER_1].partition_owner            = HAL_FLASH_EMBEDDED;
@@ -284,9 +295,9 @@ static void board_leds_init(void)
 
 void board_init(void)
 {
-		board_gpio_init();
-		board_button_init();
-		board_leds_init();
+		//board_gpio_init();
+		//board_button_init();
+		//board_leds_init();
 	
     board_partition_init();
     board_cli_init();
