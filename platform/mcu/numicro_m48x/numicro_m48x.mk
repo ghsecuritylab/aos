@@ -21,6 +21,8 @@ GLOBAL_INCLUDES += \
 #ToDo
 #Comment Library/StdDriver/src/crc.c, due to out/helloworld@numaker-pfm-m487/Modules/utility/digest_algorithm/crc.o?
 
+BUILT_FULL_DRIVER := no
+ifeq ($(BUILT_FULL_DRIVER),yes)
 $(NAME)_SOURCES += \
                    Library/StdDriver/src/acmp.c \
                    Library/StdDriver/src/bpwm.c \
@@ -59,6 +61,30 @@ $(NAME)_SOURCES += \
                    Library/StdDriver/src/wdt.c \
                    Library/StdDriver/src/wwdt.c \
                    Library/Device/Nuvoton/M480/Source/system_M480.c
+else
+$(NAME)_SOURCES += \
+                   Library/StdDriver/src/clk.c \
+                   Library/StdDriver/src/crypto.c \
+                   Library/StdDriver/src/dac.c \
+                   Library/StdDriver/src/eadc.c \
+                   Library/StdDriver/src/epwm.c \
+                   Library/StdDriver/src/fmc.c \
+                   Library/StdDriver/src/gpio.c \
+                   Library/StdDriver/src/i2c.c \
+                   Library/StdDriver/src/pdma.c \
+                   Library/StdDriver/src/qspi.c \
+                   Library/StdDriver/src/retarget.c \
+                   Library/StdDriver/src/rtc.c \
+                   Library/StdDriver/src/sdh.c \
+                   Library/StdDriver/src/spi.c \
+                   Library/StdDriver/src/spim.c \
+                   Library/StdDriver/src/sys.c \
+                   Library/StdDriver/src/timer.c \
+                   Library/StdDriver/src/timer_pwm.c \
+                   Library/StdDriver/src/uart.c \
+                   Library/StdDriver/src/wdt.c \
+                   Library/Device/Nuvoton/M480/Source/system_M480.c
+endif
 
 # AliOS-thing SoC&HAL implementation
 $(NAME)_SOURCES += aos/soc_impl.c \
@@ -83,8 +109,9 @@ $(NAME)_SOURCES += aos/soc_impl.c \
                    hal/hal_interrupt.c \
                    hal/hal_pwm.c \
                    hal/hal_flash.c \
-                   hal/hal_qspi.c
-                   
+                   hal/hal_qspi.c \
+                   hal/hal_dma.c
+
 
 ifeq ($(COMPILER),armcc)
 GLOBAL_CFLAGS   += --c99 --cpu=Cortex-M4 --apcs=/hardfp --fpu=vfpv4_sp_d16 -D__MICROLIB -g --split_sections
