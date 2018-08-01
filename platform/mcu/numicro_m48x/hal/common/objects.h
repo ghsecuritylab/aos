@@ -141,15 +141,16 @@ struct pwmout_s {
     uint32_t pulsewidth_us;
 };
 
-struct trng_s {
-    uint8_t dummy;
+struct sdh_s {
+    SDHName	 	sdh;
+    PinName 	pin_dat0;
+    PinName 	pin_dat1;
+    PinName 	pin_dat2;
+    PinName 	pin_dat3;
+    PinName 	pin_cmd;
+    PinName 	pin_clk;
+    PinName 	pin_cdn;
 };
-
-struct can_s {
-    CANName can;
-    int index; 
-};
-
 
 static inline void gpio_write(struct gpio_s *obj, int value)
 {

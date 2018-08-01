@@ -30,9 +30,8 @@ struct nu_uart_var {
 //		kbuf_queue_t	fifo_queue_tx;
 		char *				fifo_buf;
 		kbuf_queue_t	fifo_queue_rx;	
-		kmutex_t 			port_mutex;
-    ksem_t 				recv_sem;
-		ksem_t 				send_sem;	
+		kmutex_t 			port_tx_mutex;
+		kmutex_t 			port_rx_mutex;
 };
 
 static struct nu_uart_var uart0_var = {
@@ -322,14 +321,11 @@ exit_hal_get_serial_s:
 			
 				if ( krhino_buf_queue_create(&var->fifo_queue_rx, "buf_queue_uart", var->fifo_buf, MAX_BUF_UART_BYTES, 1) != RHINO_SUCCESS )
 					goto exit_hal_uart_init;
-				
-				if ( krhino_sem_create(&var->send_sem, "uartSend", 0) != RHINO_SUCCESS )
+
+				if ( krhino_mutex_create(&var->port_tx_mutex, "uartTxMutex") != RHINO_SUCCESS )
 					goto exit_hal_uart_init;
 
-				if ( krhino_sem_create(&var->recv_sem, "uartReceive", 0) != RHINO_SUCCESS )
-					goto exit_hal_uart_init;
-
-				if ( krhino_mutex_create(&var->port_mutex, "uartMutex") != RHINO_SUCCESS )
+   			if ( krhino_mutex_create(&var->port_rx_mutex, "uartTxMutex") != RHINO_SUCCESS )
 					goto exit_hal_uart_init;
 
 				// Get Uart base address
@@ -421,17 +417,15 @@ int32_t hal_uart_send(uart_dev_t *uart, const void *data, uint32_t size, uint32_
 	/* Initialized? */
 	if ( !var->ref_cnt ) goto exit_hal_uart_send;
 
-	pserial_s = var->obj;
-	pUart = (UART_T *) NU_MODBASE(pserial_s->uart);
-
   if (timeout == 0)
       timeout = 0xffffffff;
 
+	pserial_s = var->obj;
 	pUart = (UART_T *) NU_MODBASE(pserial_s->uart);
 
-    /* Wait for Lock */
-    stat = krhino_mutex_lock(&var->port_mutex, timeout);
-    if (stat != RHINO_SUCCESS)
+  /* Wait for Lock */
+  stat = krhino_mutex_lock(&var->port_tx_mutex, timeout);
+  if (stat != RHINO_SUCCESS)
         goto exit_hal_uart_send;
 
 	if ( UART_Write(pUart, (uint8_t*)data, size) != size )
@@ -439,9 +433,9 @@ int32_t hal_uart_send(uart_dev_t *uart, const void *data, uint32_t size, uint32_
 	//Todo: implement timeout feature.
 
 	/* Unlock before exiting. */
-    krhino_mutex_unlock(&var->port_mutex);
-    if (stat != RHINO_SUCCESS)
-          goto exit_hal_uart_send;
+  stat = krhino_mutex_unlock(&var->port_tx_mutex);
+  if (stat != RHINO_SUCCESS)
+    goto exit_hal_uart_send;
  
     return HAL_OK;
     
@@ -451,7 +445,7 @@ exit_hal_uart_send:
 }
 
 
-int32_t platform_uart_read(struct nu_uart_var *var, uint8_t pu8RxBuf[], uint32_t u32ReadBytes, uint32_t timeout, ksem_t* pRecvSem)
+int32_t platform_uart_read(struct nu_uart_var *var, uint8_t pu8RxBuf[], uint32_t u32ReadBytes, uint32_t timeout )
 {
 		int32_t	ret=0, i, rev_size=0;
 		int rx_count = 0;
@@ -470,13 +464,6 @@ int32_t platform_uart_read(struct nu_uart_var *var, uint8_t pu8RxBuf[], uint32_t
 		return rx_count;
 }
 
-int32_t platform_uart_getc(struct serial_s *pserial_s, uint8_t pu8RxBuf[])
-{
-		UART_T* pUart = (UART_T *) NU_MODBASE(pserial_s->uart);
-		return UART_Read ( pUart, pu8RxBuf, 1);
-}
-
-#if 1
 /**
  * Receive data on a UART interface
  *
@@ -493,6 +480,7 @@ int32_t hal_uart_recv(uart_dev_t *uart, void *data, uint32_t expect_size, uint32
 	struct nu_modinit_s *modinit;	
 	struct serial_s* pserial_s;
   struct nu_uart_var *var;
+  kstat_t stat = RHINO_SUCCESS;
 
 	int count=0;
 
@@ -516,10 +504,17 @@ int32_t hal_uart_recv(uart_dev_t *uart, void *data, uint32_t expect_size, uint32
 
 	pserial_s = var->obj;
 
-//	if ( expect_size == 1ul )
-//		count = platform_uart_getc( pserial_s, (uint8_t*)data );
-//  else 
-		count = platform_uart_read(var, (uint8_t*)data, expect_size, timeout, &var->recv_sem);
+	/* Wait for Lock */
+  stat = krhino_mutex_lock(&var->port_rx_mutex, timeout);
+  if (stat != RHINO_SUCCESS)
+     goto exit_hal_uart_recv;
+
+	count = platform_uart_read(var, (uint8_t*)data, expect_size, timeout);	
+
+	/* Unlock before exiting. */
+  stat = krhino_mutex_unlock(&var->port_rx_mutex);
+  if (stat != RHINO_SUCCESS)
+    goto exit_hal_uart_recv;
 	
 	if ( count != expect_size  )
 		goto exit_hal_uart_recv;
@@ -529,9 +524,7 @@ int32_t hal_uart_recv(uart_dev_t *uart, void *data, uint32_t expect_size, uint32
 exit_hal_uart_recv:
 
 	return HAL_ERROR;
-
 }
-#endif
 
 /**
  * Receive data on a UART interface
@@ -551,7 +544,7 @@ int32_t hal_uart_recv_II(uart_dev_t *uart, void *data, uint32_t expect_size,
 	struct nu_modinit_s *modinit;		
 	struct serial_s* pserial_s;
   struct nu_uart_var *var;
-	
+  kstat_t stat = RHINO_SUCCESS;
 	int count=0;
 
   if ( !uart )
@@ -574,12 +567,18 @@ int32_t hal_uart_recv_II(uart_dev_t *uart, void *data, uint32_t expect_size,
 
 	pserial_s = var->obj;
 
-//	if ( expect_size == 1ul )
-//		count = platform_uart_getc ( pserial_s, (uint8_t*)data );
-//	else 
-		count = platform_uart_read(var, (uint8_t*)data, expect_size, timeout, &var->recv_sem);
+	/* Wait for Lock */
+  stat = krhino_mutex_lock(&var->port_rx_mutex, timeout);
+  if (stat != RHINO_SUCCESS)
+     goto exit_hal_uart_recv_ii;
+
+	*recv_size = platform_uart_read(var, (uint8_t*)data, expect_size, timeout);	
 	
-	*recv_size = count;
+	/* Unlock before exiting. */
+  stat = krhino_mutex_unlock(&var->port_rx_mutex);
+  if (stat != RHINO_SUCCESS)
+    goto exit_hal_uart_recv_ii;
+	
   return HAL_OK;
     
 exit_hal_uart_recv_ii:
@@ -632,9 +631,7 @@ int32_t hal_uart_finalize(uart_dev_t *uart)
 					CLK_DisableModuleClock(modinit->clkidx);
 		} while (0);
 
-		krhino_sem_del(&var->send_sem);
-		krhino_sem_del(&var->recv_sem);
-		krhino_mutex_del(&var->port_mutex);
+		krhino_mutex_del(&var->port_tx_mutex);
 		krhino_buf_queue_del(&var->fifo_queue_rx);
 		
 		/* Unlink parent and children. */

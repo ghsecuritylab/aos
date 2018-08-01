@@ -50,9 +50,9 @@ void hal_timer_stop(timer_dev_t *tmr)
 }
 #endif
 
-//#if defined(DEV_SAL_MK3060)
+#if defined(DEV_SAL_MK3060)
 extern hal_wifi_module_t aos_wifi_module_mk3060;
-//#endif
+#endif
 
 void hal_reboot(void)
 {
@@ -62,11 +62,10 @@ void hw_start_hal(void)
 {
     printf("[%s]\n", __func__);
 
-		hal_wifi_register_module(&aos_wifi_module_mk3060);
-	
-//#if defined(DEV_SAL_MK3060)
+#if defined(DEV_SAL_MK3060)
+		hal_wifi_register_module(&aos_wifi_module_mk3060);	
     hal_ota_register_module(&aos_wifi_module_mk3060);
-//#endif
+#endif
 
 		hal_wifi_init();
 }

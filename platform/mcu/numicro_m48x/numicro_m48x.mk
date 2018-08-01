@@ -3,7 +3,7 @@ HOST_OPENOCD := m48x
 $(NAME)_TYPE := kernel
 
 $(NAME)_COMPONENTS += platform/arch/arm/armv7m
-$(NAME)_COMPONENTS += libc rhino hal vfs digest_algorithm
+$(NAME)_COMPONENTS += libc rhino hal vfs digest_algorithm kernel.modules.fs.kv
 
 GLOBAL_DEFINES += CONFIG_AOS_KV_MULTIPTN_MODE
 GLOBAL_DEFINES += CONFIG_AOS_KV_PTN=6

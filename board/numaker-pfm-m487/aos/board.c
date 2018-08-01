@@ -146,6 +146,22 @@ struct qspi_s board_qspi [] =
 };
 const int i32BoardMaxQSPINum  = sizeof( board_qspi ) / sizeof( board_qspi[0] );
 
+/* SD */
+struct sdh_s board_sdh [] = 
+{
+	{	
+		.sdh	 		= SDH_0,
+		.pin_dat0 = PE_2,
+		.pin_dat1	= PE_3,
+		.pin_dat2	= PB_4,
+		.pin_dat3	= PB_5,
+		.pin_cmd	= PE_7,
+		.pin_clk	= PE_6,
+		.pin_cdn	= PD_13,
+	},
+};
+const int i32BoardMaxSDHNum  = sizeof( board_sdh ) / sizeof( board_sdh[0] );
+
 // FIXME
 gpio_dev_t board_gpio_table[] = 
 {
@@ -173,132 +189,80 @@ gpio_dev_t board_gpio_table[] =
 };
 
 /* Logic partition on flash devices */
-hal_logic_partition_t hal_partitions[HAL_PARTITION_MAX];
-
-/* Board partition */
-static void board_partition_init()
-{
-    hal_partitions[HAL_PARTITION_APPLICATION].partition_owner            = HAL_FLASH_EMBEDDED;
-    hal_partitions[HAL_PARTITION_APPLICATION].partition_description      = "Application";
-    hal_partitions[HAL_PARTITION_APPLICATION].partition_start_addr       = FMC_APROM_BASE;	//0x80000, 512k
-    hal_partitions[HAL_PARTITION_APPLICATION].partition_length           = 0x40000;    			//128k bytes
-    hal_partitions[HAL_PARTITION_APPLICATION].partition_options          = PAR_OPT_READ_EN | PAR_OPT_WRITE_EN;
-
-    hal_partitions[HAL_PARTITION_PARAMETER_1].partition_owner            = HAL_FLASH_EMBEDDED;
-    hal_partitions[HAL_PARTITION_PARAMETER_1].partition_description      = "PARAMETER1";
-    hal_partitions[HAL_PARTITION_PARAMETER_1].partition_start_addr       = hal_partitions[HAL_PARTITION_APPLICATION].partition_start_addr+hal_partitions[HAL_PARTITION_APPLICATION].partition_length;
-    hal_partitions[HAL_PARTITION_PARAMETER_1].partition_length           = FMC_FLASH_PAGE_SIZE; // 4k bytes
-    hal_partitions[HAL_PARTITION_PARAMETER_1].partition_options          = PAR_OPT_READ_EN | PAR_OPT_WRITE_EN;
-
-    hal_partitions[HAL_PARTITION_PARAMETER_2].partition_owner            = HAL_FLASH_EMBEDDED;
-    hal_partitions[HAL_PARTITION_PARAMETER_2].partition_description      = "PARAMETER2";
-    hal_partitions[HAL_PARTITION_PARAMETER_2].partition_start_addr       = hal_partitions[HAL_PARTITION_PARAMETER_1].partition_start_addr + hal_partitions[HAL_PARTITION_PARAMETER_1].partition_length;
-    hal_partitions[HAL_PARTITION_PARAMETER_2].partition_length           = FMC_FLASH_PAGE_SIZE*2; //8k bytes
-    hal_partitions[HAL_PARTITION_PARAMETER_2].partition_options          = PAR_OPT_READ_EN | PAR_OPT_WRITE_EN;
-
-    hal_partitions[HAL_PARTITION_PARAMETER_3].partition_owner            = HAL_FLASH_EMBEDDED;
-    hal_partitions[HAL_PARTITION_PARAMETER_3].partition_description      = "PARAMETER3";
-    hal_partitions[HAL_PARTITION_PARAMETER_3].partition_start_addr       = hal_partitions[HAL_PARTITION_PARAMETER_2].partition_start_addr+hal_partitions[HAL_PARTITION_PARAMETER_2].partition_length;
-    hal_partitions[HAL_PARTITION_PARAMETER_3].partition_length           = FMC_FLASH_PAGE_SIZE*2; //8k bytes
-    hal_partitions[HAL_PARTITION_PARAMETER_3].partition_options          = PAR_OPT_READ_EN | PAR_OPT_WRITE_EN;
-
-    hal_partitions[HAL_PARTITION_PARAMETER_4].partition_owner            = HAL_FLASH_EMBEDDED;
-    hal_partitions[HAL_PARTITION_PARAMETER_4].partition_description      = "PARAMETER4";
-    hal_partitions[HAL_PARTITION_PARAMETER_4].partition_start_addr       = hal_partitions[HAL_PARTITION_PARAMETER_3].partition_start_addr+hal_partitions[HAL_PARTITION_PARAMETER_3].partition_length;
-    hal_partitions[HAL_PARTITION_PARAMETER_4].partition_length           = FMC_FLASH_PAGE_SIZE*2; //8k bytes
-    hal_partitions[HAL_PARTITION_PARAMETER_4].partition_options          = PAR_OPT_READ_EN | PAR_OPT_WRITE_EN;
-
-    hal_partitions[HAL_PARTITION_CUSTOM_1].partition_owner               = HAL_FLASH_EMBEDDED;
-    hal_partitions[HAL_PARTITION_CUSTOM_1].partition_description         = "CUSTOM1";
-    hal_partitions[HAL_PARTITION_CUSTOM_1].partition_start_addr          = hal_partitions[HAL_PARTITION_PARAMETER_4].partition_start_addr+hal_partitions[HAL_PARTITION_PARAMETER_4].partition_length;
-    hal_partitions[HAL_PARTITION_CUSTOM_1].partition_length              = FMC_FLASH_PAGE_SIZE*16; //40k bytes
-    hal_partitions[HAL_PARTITION_CUSTOM_1].partition_options             = PAR_OPT_READ_EN | PAR_OPT_WRITE_EN;
-
-    hal_partitions[HAL_PARTITION_CUSTOM_2].partition_owner               = HAL_FLASH_EMBEDDED;
-    hal_partitions[HAL_PARTITION_CUSTOM_2].partition_description         = "CUSTOM2";
-    hal_partitions[HAL_PARTITION_CUSTOM_2].partition_start_addr          = hal_partitions[HAL_PARTITION_CUSTOM_1].partition_start_addr+hal_partitions[HAL_PARTITION_CUSTOM_1].partition_length;
-    hal_partitions[HAL_PARTITION_CUSTOM_2].partition_length              = FMC_FLASH_PAGE_SIZE*16; //40k bytes
-    hal_partitions[HAL_PARTITION_CUSTOM_2].partition_options             = PAR_OPT_READ_EN | PAR_OPT_WRITE_EN;
-}
-
-static uint64_t   awss_time = 0;
-
-static void key_poll_func(void *arg)
-{
-    uint32_t level;
-    uint64_t diff;
-		gpio_dev_t* psgpio;
+#define DEF_APPLICATION_START_ADDR	FMC_APROM_BASE
+#define DEF_APPLICATION_SIZE				(0x40000)									//256k bytes
+#define DEF_PARAMETER_1_START_ADDR	(DEF_APPLICATION_START_ADDR+DEF_APPLICATION_SIZE)
+#define DEF_PARAMETER_1_SIZE				FMC_FLASH_PAGE_SIZE				//4k bytes
+#define DEF_PARAMETER_2_START_ADDR	(DEF_PARAMETER_1_START_ADDR+DEF_PARAMETER_1_SIZE)
+#define DEF_PARAMETER_2_SIZE				(FMC_FLASH_PAGE_SIZE*2)		//8k bytes
+#define DEF_PARAMETER_3_START_ADDR	(DEF_PARAMETER_2_START_ADDR+DEF_PARAMETER_2_SIZE)
+#define DEF_PARAMETER_3_SIZE				(FMC_FLASH_PAGE_SIZE*2)		//8k bytes
+#define DEF_PARAMETER_4_START_ADDR	(DEF_PARAMETER_3_START_ADDR+DEF_PARAMETER_3_SIZE)
+#define DEF_PARAMETER_4_SIZE				(FMC_FLASH_PAGE_SIZE*2)		//8k bytes
+#define DEF_CUSTOM_1_START_ADDR			(DEF_PARAMETER_4_START_ADDR+DEF_PARAMETER_4_SIZE)
+#define DEF_CUSTOM_1_SIZE						(FMC_FLASH_PAGE_SIZE*16) 	//64k bytes
+#define DEF_CUSTOM_2_START_ADDR			(DEF_CUSTOM_1_START_ADDR+DEF_CUSTOM_1_SIZE)
+#define DEF_CUSTOM_2_SIZE						(FMC_FLASH_PAGE_SIZE*16) 	//64k bytes
+const hal_logic_partition_t hal_partitions[HAL_PARTITION_MAX] = {
 	
-    hal_gpio_input_get((gpio_dev_t*)arg, &level);
-		psgpio = (gpio_dev_t*)arg;
+  [HAL_PARTITION_APPLICATION] = {
+		.partition_owner          	= HAL_FLASH_EMBEDDED,
+		.partition_description      = "Application",
+		.partition_start_addr       = DEF_APPLICATION_START_ADDR,
+    .partition_length           = DEF_APPLICATION_SIZE,
+    .partition_options          = PAR_OPT_READ_EN | PAR_OPT_WRITE_EN
+	},
+
+	[HAL_PARTITION_PARAMETER_1] = {
+		.partition_owner            = HAL_FLASH_EMBEDDED,
+		.partition_description      = "PARAMETER1",
+		.partition_start_addr       = DEF_PARAMETER_1_START_ADDR,
+		.partition_length           = DEF_PARAMETER_1_SIZE,
+    .partition_options          = PAR_OPT_READ_EN | PAR_OPT_WRITE_EN
+	},
+
+  [HAL_PARTITION_PARAMETER_2] = {
+		.partition_owner            = HAL_FLASH_EMBEDDED,
+    .partition_description      = "PARAMETER2",
+    .partition_start_addr       = DEF_PARAMETER_2_START_ADDR,
+    .partition_length           = DEF_PARAMETER_2_SIZE,
+    .partition_options          = PAR_OPT_READ_EN | PAR_OPT_WRITE_EN
+	},
 	
-    if (level == 0) { // still pressed
-        aos_post_delayed_action(10, key_poll_func, arg);
-    } else {		// released
-        diff = aos_now_ms() - awss_time;
-        if (diff > 5000) { 				/*long long press, 5 seconds */
-            awss_time = 0;
-            aos_post_event(EV_KEY, psgpio->port, VALUE_KEY_LLTCLICK);
-        } else if (diff > 2000) { /* long press, 2 seconds */
-            awss_time = 0;
-            aos_post_event(EV_KEY, psgpio->port, VALUE_KEY_LTCLICK);
-        } else if (diff > 40) { 	/* short press, 40 miliseconds */
-            awss_time = 0;
-            aos_post_event(EV_KEY, psgpio->port, VALUE_KEY_CLICK);
-        } else {
-            aos_post_delayed_action(10, key_poll_func, arg);
-        }
-    }
-}
+	[HAL_PARTITION_PARAMETER_3]	=	{
+		.partition_owner            = HAL_FLASH_EMBEDDED,
+    .partition_description      = "PARAMETER3",
+    .partition_start_addr       = DEF_PARAMETER_3_START_ADDR,
+    .partition_length           = DEF_PARAMETER_3_SIZE,
+    .partition_options          = PAR_OPT_READ_EN | PAR_OPT_WRITE_EN
+	},
 
-static void key_proc_work(void *arg)
-{
-    aos_schedule_call(key_poll_func, arg);
-}
-
-static void handle_awss_key(void *arg)
-{
-    uint32_t gpio_value;
-
-    hal_gpio_input_get((gpio_dev_t*)arg, &gpio_value);
-    if (gpio_value == 0 && awss_time == 0) {
-        awss_time = aos_now_ms();
-        aos_loop_schedule_work(0, key_proc_work, arg, NULL, NULL);
-    }
-}
-
-static void board_gpio_init(void)
-{
-		int i;
-    for (i = 0; i < i32BoardMaxGPIONum; ++i)
-        hal_gpio_init(&board_gpio_table[i]);
-}
-
-static void board_button_init(void)
-{		
-		//SW2
-		hal_gpio_enable_irq(&board_gpio_table[16], IRQ_TRIGGER_FALLING_EDGE, handle_awss_key, (void*)&board_gpio_table[16]);		
-		
-		//SW3
-		hal_gpio_enable_irq(&board_gpio_table[17], IRQ_TRIGGER_FALLING_EDGE, handle_awss_key, (void*)&board_gpio_table[17]);		
-}
-
-static void board_leds_init(void)
-{
-		//LED_RED
-		hal_gpio_output_low(&board_gpio_table[18]);
-		//LED_YELLOW
-		hal_gpio_output_low(&board_gpio_table[19]);
-		//LED_GREEN
-		hal_gpio_output_low(&board_gpio_table[20]);
-}
+  [HAL_PARTITION_PARAMETER_4] = {
+		.partition_owner            = HAL_FLASH_EMBEDDED,
+    .partition_description      = "PARAMETER4",
+    .partition_start_addr       = DEF_PARAMETER_4_START_ADDR,
+    .partition_length           = DEF_PARAMETER_4_SIZE,
+    .partition_options          = PAR_OPT_READ_EN | PAR_OPT_WRITE_EN
+	},
+	
+  [HAL_PARTITION_CUSTOM_1]		= {
+		.partition_owner            = HAL_FLASH_EMBEDDED,
+    .partition_description      = "CUSTOM1",
+    .partition_start_addr       = DEF_CUSTOM_1_START_ADDR,
+    .partition_length           = DEF_CUSTOM_1_SIZE,
+    .partition_options          = PAR_OPT_READ_EN | PAR_OPT_WRITE_EN,
+	},
+	
+  [HAL_PARTITION_CUSTOM_2]		= {
+		.partition_owner            = HAL_FLASH_EMBEDDED,
+    .partition_description      = "CUSTOM2",
+    .partition_start_addr       = DEF_CUSTOM_2_START_ADDR,
+    .partition_length           = DEF_CUSTOM_2_SIZE,
+    .partition_options          = PAR_OPT_READ_EN | PAR_OPT_WRITE_EN
+	}
+};
 
 void board_init(void)
 {
-		//board_gpio_init();
-		//board_button_init();
-		//board_leds_init();
-	
-    board_partition_init();
     board_cli_init();
 }

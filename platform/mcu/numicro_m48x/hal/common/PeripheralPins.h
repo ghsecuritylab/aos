@@ -82,26 +82,26 @@ extern const PinMap PinMap_QSPI_SCLK[];
 //*** QSPI_SSEL ***
 extern const PinMap PinMap_QSPI_SSEL[];
 
-//*** SD_DAT0 ***
-extern const PinMap PinMap_SD_DAT0[];
+//*** SDH_DAT0 ***
+extern const PinMap PinMap_SDH_DAT0[];
 
-//*** SD_DAT1 ***
-extern const PinMap PinMap_SD_DAT1[];
+//*** SDH_DAT1 ***
+extern const PinMap PinMap_SDH_DAT1[];
 
-//*** SD_DAT2 ***
-extern const PinMap PinMap_SD_DAT2[];
+//*** SDH_DAT2 ***
+extern const PinMap PinMap_SDH_DAT2[];
 
-//*** SD_DAT3 ***
-extern const PinMap PinMap_SD_DAT3[];
+//*** SDH_DAT3 ***
+extern const PinMap PinMap_SDH_DAT3[];
 
-//*** SD_CMD ***
-extern const PinMap PinMap_SD_CMD[];
+//*** SDH_CMD ***
+extern const PinMap PinMap_SDH_CMD[];
 
-//*** SD_CLK ***
-extern const PinMap PinMap_SD_CLK[];
+//*** SDH_CLK ***
+extern const PinMap PinMap_SDH_CLK[];
 
-//*** SD_CD ***
-extern const PinMap PinMap_SD_CD[];
+//*** SDH_CD ***
+extern const PinMap PinMap_SDH_CD[];
 
 //*** CAN_TX ***
 extern const PinMap PinMap_CAN_TX[];

@@ -142,10 +142,10 @@ typedef enum {
 #define	DMA_MAX 	1
 
 typedef enum {
-    SD_0 = (int) NU_MODNAME(SDH0_BASE, 0, 0),
-    SD_1 = (int) NU_MODNAME(SDH1_BASE, 1, 0)
-} SDName;
-#define	SD_MAX		2
+    SDH_0 = (int) NU_MODNAME(SDH0_BASE, 0, 0),
+    SDH_1 = (int) NU_MODNAME(SDH1_BASE, 1, 0)
+} SDHName;
+#define	SDH_MAX		2
 
 typedef enum {
     CAN_0 = (int) NU_MODNAME(CAN0_BASE, 0, 0),

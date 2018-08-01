@@ -451,73 +451,73 @@ const PinMap PinMap_QSPI_SSEL[] = {
     { NC,   NC,    0 }
 };
 
-//*** SD_DAT0 ***
-const PinMap PinMap_SD_DAT0[] = { 
-    { PA_0, 	 SD_1 , 	 SYS_GPA_MFPL_PA0MFP_SD1_DAT0  },
-    { PA_8, 	 SD_1 , 	 SYS_GPA_MFPH_PA8MFP_SD1_DAT0  },
-    { PB_2, 	 SD_0 , 	 SYS_GPB_MFPL_PB2MFP_SD0_DAT0  },
-    { PE_2, 	 SD_0 , 	 SYS_GPE_MFPL_PE2MFP_SD0_DAT0  },
-    { PG_12, 	 SD_1 , 	 SYS_GPG_MFPH_PG12MFP_SD1_DAT0  },
+//*** SDH_DAT0 ***
+const PinMap PinMap_SDH_DAT0[] = { 
+    { PA_0, 	 SDH_1 , 	 SYS_GPA_MFPL_PA0MFP_SD1_DAT0  },
+    { PA_8, 	 SDH_1 , 	 SYS_GPA_MFPH_PA8MFP_SD1_DAT0  },
+    { PB_2, 	 SDH_0 , 	 SYS_GPB_MFPL_PB2MFP_SD0_DAT0  },
+    { PE_2, 	 SDH_0 , 	 SYS_GPE_MFPL_PE2MFP_SD0_DAT0  },
+    { PG_12, 	 SDH_1 , 	 SYS_GPG_MFPH_PG12MFP_SD1_DAT0  },
     { NC,   NC,    0 }
 };
 
-//*** SD_DAT1 ***
-const PinMap PinMap_SD_DAT1[] = { 
-    { PA_1, 	 SD_1 , 	 SYS_GPA_MFPL_PA1MFP_SD1_DAT1  },
-    { PA_9, 	 SD_1 , 	 SYS_GPA_MFPH_PA9MFP_SD1_DAT1  },
-    { PB_3, 	 SD_0 , 	 SYS_GPB_MFPL_PB3MFP_SD0_DAT1  },
-    { PE_3, 	 SD_0 , 	 SYS_GPE_MFPL_PE3MFP_SD0_DAT1  },
-    { PG_11, 	 SD_1 , 	 SYS_GPG_MFPH_PG11MFP_SD1_DAT1  },
+//*** SDH_DAT1 ***
+const PinMap PinMap_SDH_DAT1[] = { 
+    { PA_1, 	 SDH_1 , 	 SYS_GPA_MFPL_PA1MFP_SD1_DAT1  },
+    { PA_9, 	 SDH_1 , 	 SYS_GPA_MFPH_PA9MFP_SD1_DAT1  },
+    { PB_3, 	 SDH_0 , 	 SYS_GPB_MFPL_PB3MFP_SD0_DAT1  },
+    { PE_3, 	 SDH_0 , 	 SYS_GPE_MFPL_PE3MFP_SD0_DAT1  },
+    { PG_11, 	 SDH_1 , 	 SYS_GPG_MFPH_PG11MFP_SD1_DAT1  },
     { NC,   NC,    0 }
 };
 
-//*** SD_DAT2 ***
-const PinMap PinMap_SD_DAT2[] = { 
-    { PA_2, 	 SD_1 , 	 SYS_GPA_MFPL_PA2MFP_SD1_DAT2  },
-    { PA_10, 	 SD_1 , 	 SYS_GPA_MFPH_PA10MFP_SD1_DAT2  },
-    { PB_4, 	 SD_0 , 	 SYS_GPB_MFPL_PB4MFP_SD0_DAT2  },
-    { PE_4, 	 SD_0 , 	 SYS_GPE_MFPL_PE4MFP_SD0_DAT2  },
-    { PG_10, 	 SD_1 , 	 SYS_GPG_MFPH_PG10MFP_SD1_DAT2  },
+//*** SDH_DAT2 ***
+const PinMap PinMap_SDH_DAT2[] = { 
+    { PA_2, 	 SDH_1 , 	 SYS_GPA_MFPL_PA2MFP_SD1_DAT2  },
+    { PA_10, 	 SDH_1 , 	 SYS_GPA_MFPH_PA10MFP_SD1_DAT2  },
+    { PB_4, 	 SDH_0 , 	 SYS_GPB_MFPL_PB4MFP_SD0_DAT2  },
+    { PE_4, 	 SDH_0 , 	 SYS_GPE_MFPL_PE4MFP_SD0_DAT2  },
+    { PG_10, 	 SDH_1 , 	 SYS_GPG_MFPH_PG10MFP_SD1_DAT2  },
     { NC,   NC,    0 }
 };
 
-//*** SD_DAT3 ***
-const PinMap PinMap_SD_DAT3[] = { 
-    { PA_3, 	 SD_1 , 	 SYS_GPA_MFPL_PA3MFP_SD1_DAT3  },
-    { PA_11, 	 SD_1 , 	 SYS_GPA_MFPH_PA11MFP_SD1_DAT3  },
-    { PB_5, 	 SD_0 , 	 SYS_GPB_MFPL_PB5MFP_SD0_DAT3  },
-    { PE_5, 	 SD_0 , 	 SYS_GPE_MFPL_PE5MFP_SD0_DAT3  },
-    { PG_9, 	 SD_1 , 	 SYS_GPG_MFPH_PG9MFP_SD1_DAT3  },
+//*** SDH_DAT3 ***
+const PinMap PinMap_SDH_DAT3[] = { 
+    { PA_3, 	 SDH_1 , 	 SYS_GPA_MFPL_PA3MFP_SD1_DAT3  },
+    { PA_11, 	 SDH_1 , 	 SYS_GPA_MFPH_PA11MFP_SD1_DAT3  },
+    { PB_5, 	 SDH_0 , 	 SYS_GPB_MFPL_PB5MFP_SD0_DAT3  },
+    { PE_5, 	 SDH_0 , 	 SYS_GPE_MFPL_PE5MFP_SD0_DAT3  },
+    { PG_9, 	 SDH_1 , 	 SYS_GPG_MFPH_PG9MFP_SD1_DAT3  },
     { NC,   NC,    0 }
 };
 
-//*** SD_CMD ***
-const PinMap PinMap_SD_CMD[] = { 
-    { PA_5, 	 SD_1 , 	 SYS_GPA_MFPL_PA5MFP_SD1_CMD  },
-    { PB_0, 	 SD_0 , 	 SYS_GPB_MFPL_PB0MFP_SD0_CMD  },
-    { PB_7, 	 SD_1 , 	 SYS_GPB_MFPL_PB7MFP_SD1_CMD  },
-    { PE_7, 	 SD_0 , 	 SYS_GPE_MFPL_PE7MFP_SD0_CMD  },
-    { PG_13, 	 SD_1 , 	 SYS_GPG_MFPH_PG13MFP_SD1_CMD  },
+//*** SDH_CMD ***
+const PinMap PinMap_SDH_CMD[] = { 
+    { PA_5, 	 SDH_1 , 	 SYS_GPA_MFPL_PA5MFP_SD1_CMD  },
+    { PB_0, 	 SDH_0 , 	 SYS_GPB_MFPL_PB0MFP_SD0_CMD  },
+    { PB_7, 	 SDH_1 , 	 SYS_GPB_MFPL_PB7MFP_SD1_CMD  },
+    { PE_7, 	 SDH_0 , 	 SYS_GPE_MFPL_PE7MFP_SD0_CMD  },
+    { PG_13, 	 SDH_1 , 	 SYS_GPG_MFPH_PG13MFP_SD1_CMD  },
     { NC,   NC,    0 }
 };
 
-//*** SD_CLK ***
-const PinMap PinMap_SD_CLK[] = { 
-    { PA_4, 	 SD_1 , 	 SYS_GPA_MFPL_PA4MFP_SD1_CLK  },
-    { PB_1, 	 SD_0 , 	 SYS_GPB_MFPL_PB1MFP_SD0_CLK  },
-    { PB_6, 	 SD_1 , 	 SYS_GPB_MFPL_PB6MFP_SD1_CLK  },
-    { PE_6, 	 SD_0 , 	 SYS_GPE_MFPL_PE6MFP_SD0_CLK  },
-    { PG_14, 	 SD_1 , 	 SYS_GPG_MFPH_PG14MFP_SD1_CLK  },
+//*** SDH_CLK ***
+const PinMap PinMap_SDH_CLK[] = { 
+    { PA_4, 	 SDH_1 , 	 SYS_GPA_MFPL_PA4MFP_SD1_CLK  },
+    { PB_1, 	 SDH_0 , 	 SYS_GPB_MFPL_PB1MFP_SD0_CLK  },
+    { PB_6, 	 SDH_1 , 	 SYS_GPB_MFPL_PB6MFP_SD1_CLK  },
+    { PE_6, 	 SDH_0 , 	 SYS_GPE_MFPL_PE6MFP_SD0_CLK  },
+    { PG_14, 	 SDH_1 , 	 SYS_GPG_MFPH_PG14MFP_SD1_CLK  },
     { NC,   NC,    0 }
 };
 
-//*** SD_CD ***
-const PinMap PinMap_SD_CD[] = { 
-    { PA_6, 	 SD_1 , 	 SYS_GPA_MFPL_PA6MFP_SD1_nCD  },
-    { PB_12, 	 SD_0 , 	 SYS_GPB_MFPH_PB12MFP_SD0_nCD  },
-    { PD_13, 	 SD_0 , 	 SYS_GPD_MFPH_PD13MFP_SD0_nCD  },
-    { PE_14, 	 SD_1 , 	 SYS_GPE_MFPH_PE14MFP_SD1_nCD  },
-    { PG_15, 	 SD_1 , 	 SYS_GPG_MFPH_PG15MFP_SD1_nCD  },
+//*** SDH_CD ***
+const PinMap PinMap_SDH_CD[] = { 
+    { PA_6, 	 SDH_1 , 	 SYS_GPA_MFPL_PA6MFP_SD1_nCD  },
+    { PB_12, 	 SDH_0 , 	 SYS_GPB_MFPH_PB12MFP_SD0_nCD  },
+    { PD_13, 	 SDH_0 , 	 SYS_GPD_MFPH_PD13MFP_SD0_nCD  },
+    { PE_14, 	 SDH_1 , 	 SYS_GPE_MFPH_PE14MFP_SD1_nCD  },
+    { PG_15, 	 SDH_1 , 	 SYS_GPG_MFPH_PG15MFP_SD1_nCD  },
     { NC,   NC,    0 }
 };
 

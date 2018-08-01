@@ -14,7 +14,9 @@
 #define DEF_TEST_DO		0
 #define DEF_TEST_BTN	1
 #define DEF_TEST_ADC	0
-#define DEF_TEST_PWM	1
+#define DEF_TEST_PWM	0
+#define DEF_TEST_LED	0
+#define DEF_TEST_SD		1
 
 uint8_t pngbuf [ 32 ];
 random_dev_t 	g_sRngDev;
@@ -45,6 +47,11 @@ pwm_dev_t			g_sPwmDev[] =
     {9,  {0.5f,10}, NULL},
     {10,  {0.5f,10}, NULL},
     {11,  {0.5f,10}, NULL},		
+};
+
+sd_dev_t			g_sSdDev[] = 
+{
+    {0,  {0, 0}, NULL},//0
 };
 
 static int g_interval=100;		//ms
@@ -198,6 +205,78 @@ void key_process(input_event_t *eventinfo, void *priv_data)
 		
 }
 
+static uint64_t   awss_time = 0;
+
+static void key_poll_func(void *arg)
+{
+    uint32_t level;
+    uint64_t diff;
+		gpio_dev_t* psgpio;
+	
+    hal_gpio_input_get((gpio_dev_t*)arg, &level);
+		psgpio = (gpio_dev_t*)arg;
+	
+    if (level == 0) { // still pressed
+        aos_post_delayed_action(10, key_poll_func, arg);
+    } else {		// released
+        diff = aos_now_ms() - awss_time;
+        if (diff > 5000) { 				/*long long press, 5 seconds */
+            awss_time = 0;
+            aos_post_event(EV_KEY, psgpio->port, VALUE_KEY_LLTCLICK);
+        } else if (diff > 2000) { /* long press, 2 seconds */
+            awss_time = 0;
+            aos_post_event(EV_KEY, psgpio->port, VALUE_KEY_LTCLICK);
+        } else if (diff > 40) { 	/* short press, 40 miliseconds */
+            awss_time = 0;
+            aos_post_event(EV_KEY, psgpio->port, VALUE_KEY_CLICK);
+        } else {
+            aos_post_delayed_action(10, key_poll_func, arg);
+        }
+    }
+}
+
+static void key_proc_work(void *arg)
+{
+    aos_schedule_call(key_poll_func, arg);
+}
+
+static void handle_awss_key(void *arg)
+{
+    uint32_t gpio_value;
+
+    hal_gpio_input_get((gpio_dev_t*)arg, &gpio_value);
+    if (gpio_value == 0 && awss_time == 0) {
+        awss_time = aos_now_ms();
+        aos_loop_schedule_work(0, key_proc_work, arg, NULL, NULL);
+    }
+}
+
+static void board_gpio_init(void)
+{
+		int i;
+    for (i = 0; i < i32BoardMaxGPIONum; ++i)
+        hal_gpio_init(&board_gpio_table[i]);
+}
+
+static void board_button_init(void)
+{		
+		//SW2
+		hal_gpio_enable_irq(&board_gpio_table[16], IRQ_TRIGGER_FALLING_EDGE, handle_awss_key, (void*)&board_gpio_table[16]);		
+		
+		//SW3
+		hal_gpio_enable_irq(&board_gpio_table[17], IRQ_TRIGGER_FALLING_EDGE, handle_awss_key, (void*)&board_gpio_table[17]);		
+}
+
+static void board_leds_init(void)
+{
+		//LED_RED
+		hal_gpio_output_low(&board_gpio_table[18]);
+		//LED_YELLOW
+		hal_gpio_output_low(&board_gpio_table[19]);
+		//LED_GREEN
+		hal_gpio_output_low(&board_gpio_table[20]);
+}
+
 static void testcase_init() {
 
 	//RNG
@@ -229,11 +308,22 @@ static void testcase_init() {
 		g_sRtcDev.config.format = HAL_RTC_FORMAT_DEC;
 		hal_rtc_set_time(&g_sRtcDev, &g_sRtcTimeData);
 	}
-	
+
+	if (DEF_TEST_BTN || DEF_TEST_LED )
+			board_gpio_init();
+
 	// SW2/SW3
 	if (DEF_TEST_BTN)
-			aos_register_event_filter(EV_KEY, key_process, NULL);
-
+	{
+		board_button_init();
+		aos_register_event_filter(EV_KEY, key_process, NULL);
+	}
+	
+	if (DEF_TEST_LED)
+	{		
+		board_leds_init();
+	}
+	
 	// A0~A5
 	if (DEF_TEST_ADC)
 	{
@@ -249,6 +339,18 @@ static void testcase_init() {
 		{
 			hal_pwm_init(&g_sPwmDev[i]);
 			hal_pwm_start(&g_sPwmDev[i]);			
+		}
+	}
+	
+	if ( DEF_TEST_SD )
+	{
+		if ( !hal_sd_init(&g_sSdDev[0]) )
+		{
+			hal_sd_info_t info;
+			if ( hal_sd_info_get(&g_sSdDev[0], &info) )
+				printf("SD0 get info failure.\r\n");
+			else
+				printf("SD card sector num=%d, size=%d.\r\n", info.blk_nums, info.blk_size);			
 		}
 	}
 }
